@@ -6,6 +6,8 @@ public class Deploy extends AbstractVerticle {
   @Override
   public void start() {
     System.out.println("Starting server...");
+
+    vertx.deployVerticle("edu.pdx.spi.verticles.DataSource");
     vertx.deployVerticle("edu.pdx.spi.verticles.Server");
   }
 }
