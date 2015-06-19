@@ -1,7 +1,9 @@
 package edu.pdx.spi.verticles;
 
 import io.vertx.core.AbstractVerticle;
+import io.vertx.core.http.HttpMethod;
 import io.vertx.ext.web.Router;
+import io.vertx.ext.web.handler.CorsHandler;
 import io.vertx.ext.web.handler.sockjs.BridgeEvent;
 import io.vertx.ext.web.handler.sockjs.BridgeOptions;
 import io.vertx.ext.web.handler.sockjs.PermittedOptions;
@@ -15,7 +17,7 @@ public class Server extends AbstractVerticle {
   @Override
   public void start() {
     Router router = Router.router(vertx);
-
+    router.route().handler(CorsHandler.create("*").allowedMethod(HttpMethod.GET));
     // Patient data routes
     PatientsHandler ph = new PatientsHandler();
     router.route("/patients/:id").handler(ph);
@@ -33,7 +35,7 @@ public class Server extends AbstractVerticle {
     BridgeOptions options = new BridgeOptions();
     options.addOutboundPermitted(new PermittedOptions().setAddressRegex(".+\\..+"));
 
-    router.route("/stream").handler(SockJSHandler.create(vertx).bridge(options, event -> {
+    router.route("/streambus/*").handler(SockJSHandler.create(vertx).bridge(options, event -> {
       if (event.type() == BridgeEvent.Type.SOCKET_CREATED) {
         System.out.println("Socket created");
       }
