@@ -5,6 +5,7 @@ import edu.pdx.spi.fakedata.models.Patient;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.impl.MessageImpl;
+import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 
 import java.util.HashMap;
@@ -63,8 +64,9 @@ public final class DataSource extends AbstractVerticle {
     });
 
     eb.consumer("numericalrequest", m -> {
-      String type = ((JsonObject) m).getString("type");
-      String id = ((JsonObject) m).getString("id");
+      JsonObject js = new JsonObject((String)m.body());
+      String type = js.getString("type");
+      String id = js.getString("id");
       String responseChannel = type + "." + id;
 
       startPeriodicNumericalQuery(type, responseChannel);
@@ -72,8 +74,9 @@ public final class DataSource extends AbstractVerticle {
     });
 
     eb.consumer("waveformrequest", m -> {
-      String type = ((JsonObject) m).getString("type");
-      String id = ((JsonObject) m).getString("id");
+      JsonObject js = new JsonObject((String)m.body());
+      String type = js.getString("type");
+      String id = js.getString("id");
       String responseChannel = type + "." + id;
 
       startPeriodicWaveformQuery(type, responseChannel);
@@ -90,6 +93,7 @@ public final class DataSource extends AbstractVerticle {
           json.put("y", rn.nextInt(200));
           eb.send(responseChannel, json.encode());
         });
+        break;
       case "bp":
         vertx.setPeriodic(1000, t -> {
           JsonObject json = new JsonObject();
@@ -97,6 +101,7 @@ public final class DataSource extends AbstractVerticle {
           json.put("y", rn.nextInt(200));
           eb.send(responseChannel, json.encode());
         });
+        break;
     }
   }
 
@@ -109,6 +114,7 @@ public final class DataSource extends AbstractVerticle {
           json.put("y", rn.nextInt(200));
           eb.send(responseChannel, json.encode());
         });
+        break;
       case "bp":
         vertx.setPeriodic(1000, t -> {
           JsonObject json = new JsonObject();
@@ -116,6 +122,7 @@ public final class DataSource extends AbstractVerticle {
           json.put("y", rn.nextInt(200));
           eb.send(responseChannel, json.encode());
         });
+        break;
     }
   }
 }
