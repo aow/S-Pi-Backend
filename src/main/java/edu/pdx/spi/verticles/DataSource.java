@@ -11,6 +11,7 @@ import io.vertx.core.json.JsonObject;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 
@@ -67,7 +68,7 @@ public final class DataSource extends AbstractVerticle {
       JsonObject js = new JsonObject((String)m.body());
       String type = js.getString("type");
       String id = js.getString("id");
-      String responseChannel = type + "." + id;
+      String responseChannel = type + "." + id + UUID.randomUUID();
 
       startPeriodicNumericalQuery(type, responseChannel);
       m.reply(responseChannel);
@@ -77,7 +78,7 @@ public final class DataSource extends AbstractVerticle {
       JsonObject js = new JsonObject((String)m.body());
       String type = js.getString("type");
       String id = js.getString("id");
-      String responseChannel = type + "." + id;
+      String responseChannel = type + "." + id + UUID.randomUUID();
 
       startPeriodicWaveformQuery(type, responseChannel);
       m.reply(responseChannel);
