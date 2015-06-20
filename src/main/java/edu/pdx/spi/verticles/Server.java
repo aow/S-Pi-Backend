@@ -1,5 +1,6 @@
 package edu.pdx.spi.verticles;
 
+import edu.pdx.spi.handlers.UnsubHandler;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.ext.web.Router;
@@ -31,13 +32,20 @@ public class Server extends AbstractVerticle {
     StreamingWaveformHandler sw = new StreamingWaveformHandler();
     router.route("/stream/waveform/:type/:id").handler(sw);
 
+    router.route("/unsub/:name").handler(new UnsubHandler());
+
     // Bridged eventbus permissions
     BridgeOptions options = new BridgeOptions();
     options.addOutboundPermitted(new PermittedOptions().setAddressRegex(".+\\..+"));
+    options.addInboundPermitted(new PermittedOptions().setAddress("unsub"));
 
     router.route("/streambus/*").handler(SockJSHandler.create(vertx).bridge(options, event -> {
       if (event.type() == BridgeEvent.Type.SOCKET_CREATED) {
         System.out.println("Socket created");
+      }
+      else if (event.type() == BridgeEvent.Type.SOCKET_CLOSED) {
+        System.out.println("Socket closed ");
+        System.out.println(event.rawMessage());
       }
 
       event.complete(true);

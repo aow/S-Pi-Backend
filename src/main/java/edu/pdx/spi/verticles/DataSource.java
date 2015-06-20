@@ -39,9 +39,12 @@ public final class DataSource extends AbstractVerticle {
   ObjectMapper om = new ObjectMapper();
   Random rn;
   EventBus eb;
+  Map<String, Long> timers;
+
   public void start() {
     rn = new Random();
     eb = vertx.eventBus();
+    timers = new HashMap<>();
 
     eb.consumer("patients", m -> {
       if (((String)m.body()).isEmpty()) {
@@ -83,46 +86,58 @@ public final class DataSource extends AbstractVerticle {
       startPeriodicWaveformQuery(type, responseChannel);
       m.reply(responseChannel);
     });
+
+    eb.consumer("unsub", m -> {
+      vertx.cancelTimer(timers.get(m.body()));
+      timers.remove(m.body());
+    });
   }
 
   private void startPeriodicWaveformQuery(String queryType, String responseChannel) {
+    long id;
     switch (queryType) {
       case "hr":
-        vertx.setPeriodic(1000, t -> {
+        id = vertx.setPeriodic(1000, t -> {
           JsonObject json = new JsonObject();
           json.put("x", System.currentTimeMillis() / 1000L);
           json.put("y", rn.nextInt(200));
           eb.send(responseChannel, json.encode());
         });
+        timers.put(responseChannel, id);
         break;
       case "bp":
-        vertx.setPeriodic(1000, t -> {
+        id = vertx.setPeriodic(1000, t -> {
           JsonObject json = new JsonObject();
           json.put("x", System.currentTimeMillis() / 1000L);
           json.put("y", rn.nextInt(200));
           eb.send(responseChannel, json.encode());
         });
+        timers.put(responseChannel, id);
         break;
     }
   }
 
   private void startPeriodicNumericalQuery(String queryType, String responseChannel) {
+    long id;
     switch (queryType) {
       case "hr":
-        vertx.setPeriodic(1000, t -> {
+        id = vertx.setPeriodic(1000, t -> {
           JsonObject json = new JsonObject();
           json.put("x", System.currentTimeMillis() / 1000L);
           json.put("y", rn.nextInt(200));
           eb.send(responseChannel, json.encode());
+          System.out.println("Fired a timer: " + responseChannel);
         });
+        timers.put(responseChannel, id);
         break;
       case "bp":
-        vertx.setPeriodic(1000, t -> {
+        id = vertx.setPeriodic(1000, t -> {
           JsonObject json = new JsonObject();
           json.put("x", System.currentTimeMillis() / 1000L);
           json.put("y", rn.nextInt(200));
           eb.send(responseChannel, json.encode());
         });
+        timers.put(responseChannel, id);
         break;
     }
   }
