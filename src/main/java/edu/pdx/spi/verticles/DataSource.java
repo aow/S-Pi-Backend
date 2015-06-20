@@ -4,16 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.pdx.spi.fakedata.models.Patient;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.eventbus.EventBus;
-import io.vertx.core.eventbus.impl.MessageImpl;
-import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
-import java.util.stream.DoubleStream;
-import java.util.stream.IntStream;
 
 final class Patients {
   Map<Integer, Patient> patients = new HashMap<>();
