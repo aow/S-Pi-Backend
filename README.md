@@ -32,4 +32,3 @@ Backend component for the S-Store MIMIC ICU Monitoring Demo
 4. Run the Runner main method in your IDE to start the server.
 
 5. (optional) Run mvn package in the main directory. It should output a s-pi-xxxxx.jar in target/. You can run that with java -jar filename.jar.
->>>>>>> jason/develop
