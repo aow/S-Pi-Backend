@@ -15,6 +15,7 @@ public final class StreamingWaveformHandler implements Handler<RoutingContext> {
 
     js.put("type", rc.request().getParam("type"));
     js.put("id", rc.request().getParam("id"));
+    js.put("remoteclient", rc.request().remoteAddress().host());
     eb.send("waveformrequests", js.encode(), m -> {
       rc.response().end((String) m.result().body());
     });
