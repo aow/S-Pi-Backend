@@ -6,10 +6,7 @@ import io.vertx.core.AbstractVerticle;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.JsonObject;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
 
 final class Patients {
   Map<Integer, Patient> patients = new HashMap<>();
@@ -35,12 +32,12 @@ public final class DataSource extends AbstractVerticle {
   ObjectMapper om = new ObjectMapper();
   Random rn;
   EventBus eb;
-  Map<String, Long> timers;
+  Map<String, ArrayList<Long>> activeClientTimers;
 
   public void start() {
     rn = new Random();
     eb = vertx.eventBus();
-    timers = new HashMap<>();
+    activeClientTimers = new HashMap<>();
 
     eb.consumer("patients", m -> {
       if (((String)m.body()).isEmpty()) {
@@ -69,7 +66,7 @@ public final class DataSource extends AbstractVerticle {
       String id = js.getString("id");
       String responseChannel = type + "." + id + UUID.randomUUID();
 
-      startPeriodicNumericalQuery(type, responseChannel);
+      startPeriodicNumericalQuery(type, responseChannel, js.getString("remoteclient"));
       m.reply(responseChannel);
     });
 
@@ -79,18 +76,23 @@ public final class DataSource extends AbstractVerticle {
       String id = js.getString("id");
       String responseChannel = type + "." + id + UUID.randomUUID();
 
-      startPeriodicWaveformQuery(type, responseChannel);
+      startPeriodicWaveformQuery(type, responseChannel, js.getString("remoteclient"));
       m.reply(responseChannel);
     });
 
     eb.consumer("unsub", m -> {
-      vertx.cancelTimer(timers.get(m.body()));
-      timers.remove(m.body());
+      ArrayList<Long> ids = activeClientTimers.get(m.body());
+
+      for (Long id : ids) {
+        vertx.cancelTimer(id);
+      }
+
+      activeClientTimers.remove(m.body());
     });
   }
 
-  private void startPeriodicWaveformQuery(String queryType, String responseChannel) {
-    long id;
+  private void startPeriodicWaveformQuery(String queryType, String responseChannel, String remoteClient) {
+    long id = 0L;
     switch (queryType) {
       case "hr":
         id = vertx.setPeriodic(1000, t -> {
@@ -99,7 +101,6 @@ public final class DataSource extends AbstractVerticle {
           json.put("y", rn.nextInt(200));
           eb.send(responseChannel, json.encode());
         });
-        timers.put(responseChannel, id);
         break;
       case "bp":
         id = vertx.setPeriodic(1000, t -> {
@@ -108,13 +109,21 @@ public final class DataSource extends AbstractVerticle {
           json.put("y", rn.nextInt(200));
           eb.send(responseChannel, json.encode());
         });
-        timers.put(responseChannel, id);
         break;
+    }
+
+    ArrayList<Long> ids = activeClientTimers.get(remoteClient);
+    if (ids != null) {
+      ids.add(id);
+    } else {
+      ids = new ArrayList<>();
+      ids.add(id);
+      activeClientTimers.put(remoteClient, ids);
     }
   }
 
-  private void startPeriodicNumericalQuery(String queryType, String responseChannel) {
-    long id;
+  private void startPeriodicNumericalQuery(String queryType, String responseChannel, String remoteClient) {
+    long id = 0L;
     switch (queryType) {
       case "hr":
         id = vertx.setPeriodic(1000, t -> {
@@ -124,7 +133,6 @@ public final class DataSource extends AbstractVerticle {
           eb.send(responseChannel, json.encode());
           System.out.println("Fired a timer: " + responseChannel);
         });
-        timers.put(responseChannel, id);
         break;
       case "bp":
         id = vertx.setPeriodic(1000, t -> {
@@ -133,8 +141,16 @@ public final class DataSource extends AbstractVerticle {
           json.put("y", rn.nextInt(200));
           eb.send(responseChannel, json.encode());
         });
-        timers.put(responseChannel, id);
         break;
+    }
+
+    ArrayList<Long> ids = activeClientTimers.get(remoteClient);
+    if (ids != null) {
+      ids.add(id);
+    } else {
+      ids = new ArrayList<>();
+      ids.add(id);
+      activeClientTimers.put(remoteClient, ids);
     }
   }
 }
