@@ -15,27 +15,31 @@ Backend component for the S-Store MIMIC ICU Monitoring Demo
 
 # Current available REST queries
 ### Clinical data
-/api/patients - Returns all available patients
+/patients - Returns all available patients
 
-/api/patients/[id] - Returns a specific patient with the given id.
+/patients/[id] - Returns a specific patient with the given id.
 
 ### Streaming data
 
-/api/stream/waveform/[type]/[id] - Returns an eventbus channel that you can register a handler for.
+/stream/waveform/[type]/[id] - Returns an eventbus channel that you can register a handler for.
 
-/api/stream/numerical/[type]/[id] - Same as waveform, returns an eventbus channel.
+/stream/numerical/[type]/[id] - Same as waveform, returns an eventbus channel.
 
 Right now, the types supported are `hr, bp`, which are just randomly generated. Any id value is valid. This will change once we integrate with S-Store.
 
+### Alerts
+
+/alerts/[id] - Returns the channel that will broadcast alerts about the specific patient.
+
 ### Server specific stuff
 
-/api/streambus - The eventbus endpoint that you connect to.
+/streambus - The eventbus endpoint that you connect to.
 
 # Integrating with the frontend
 
 You need to include https://github.com/vert-x3/vertx-web/blob/3.0.0/src/client/vertxbus.js library.
 
-After that, you connect with the eventbus by doing `var eb = new vertx.EventBus("http://.../api/streambus")`, where the ... is whatever hostname the vertx server is listening on.
+After that, you connect with the eventbus by doing `var eb = new vertx.EventBus("http://.../streambus")`, where the ... is whatever hostname the vertx server is listening on.
 
 Once that is set up, whenever you need to start streaming data, simply issue an XHR request to the previous endpoints. They return the channel you have to listen on to get the streaming data. You use that as follows:
 
