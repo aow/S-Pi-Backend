@@ -6,7 +6,9 @@ import io.vertx.core.AbstractVerticle;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.JsonObject;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
 
 final class Patients {
   Map<Integer, Patient> patients = new HashMap<>();
@@ -32,22 +34,26 @@ public final class DataSource extends AbstractVerticle {
   ObjectMapper om = new ObjectMapper();
   Random rn;
   EventBus eb;
-  Map<String, ArrayList<Long>> activeClientTimers;
+  Map<String, Long> activeClientTimers;
+  Map<String, Integer> listenerCounts;
+  boolean DEBUG;
 
   public void start() {
+    DEBUG = this.config().getBoolean("debug");
     rn = new Random();
     eb = vertx.eventBus();
     activeClientTimers = new HashMap<>();
+    listenerCounts = new HashMap<>();
 
     eb.consumer("patients", m -> {
-      if (((String)m.body()).isEmpty()) {
+      if (((String) m.body()).isEmpty()) {
         try {
           m.reply(om.writeValueAsString(patientData.getAllPatients()));
         } catch (Exception e) {
           m.reply("error parsing patient data");
         }
       } else {
-        Patient p = patientData.getPatient(Integer.parseInt((String)m.body()));
+        Patient p = patientData.getPatient(Integer.parseInt((String) m.body()));
         if (p != null) {
           try {
             m.reply(om.writeValueAsString(p));
@@ -60,97 +66,68 @@ public final class DataSource extends AbstractVerticle {
       }
     });
 
-    eb.consumer("numericalrequest", m -> {
-      JsonObject js = new JsonObject((String)m.body());
-      String type = js.getString("type");
-      String id = js.getString("id");
-      String responseChannel = type + "." + id + UUID.randomUUID();
+    eb.consumer("streamrequest", m -> {
+      JsonObject requestData = (JsonObject) m.body();
 
-      startPeriodicNumericalQuery(type, responseChannel, js.getString("remoteclient"));
+      String responseChannel = requestData.getString("type") + "." + requestData.getString("id");
+
+      startStreamingQuery(responseChannel, requestData.getString("tyoe"), requestData.getString("id"));
+
       m.reply(responseChannel);
     });
 
-    eb.consumer("waveformrequest", m -> {
-      JsonObject js = new JsonObject((String)m.body());
-      String type = js.getString("type");
-      String id = js.getString("id");
-      String responseChannel = type + "." + id + UUID.randomUUID();
-
-      startPeriodicWaveformQuery(type, responseChannel, js.getString("remoteclient"));
-      m.reply(responseChannel);
-    });
-
-    eb.consumer("unsub", m -> {
-      ArrayList<Long> ids = activeClientTimers.get(m.body());
-
-      for (Long id : ids) {
-        vertx.cancelTimer(id);
-      }
-
-      activeClientTimers.remove(m.body());
+    eb.consumer("ended", m -> {
+      JsonObject data = (JsonObject) m.body();
+      data.getJsonArray("channels").forEach((k) -> {
+        listenerCounts.computeIfPresent((String) k, (x, y) -> {
+          y -= y;
+          if (y <= 0) {
+            killTimer(x);
+            return null;
+          }
+          return y;
+        });
+      });
     });
   }
 
-  private void startPeriodicWaveformQuery(String queryType, String responseChannel, String remoteClient) {
-    long id = 0L;
-    switch (queryType) {
-      case "hr":
-        id = vertx.setPeriodic(1000, t -> {
-          JsonObject json = new JsonObject();
-          json.put("x", System.currentTimeMillis() / 1000L);
-          json.put("y", rn.nextInt(200));
-          eb.send(responseChannel, json.encode());
-        });
-        break;
-      case "bp":
-        id = vertx.setPeriodic(1000, t -> {
-          JsonObject json = new JsonObject();
-          json.put("x", System.currentTimeMillis() / 1000L);
-          json.put("y", rn.nextInt(200));
-          eb.send(responseChannel, json.encode());
-        });
-        break;
+  private void startStreamingQuery(String responseChannel, String type, String id) {
+    long timerId;
+
+    // If an entry exists, there is a timer running already, so just do no work
+    if (activeClientTimers.get(responseChannel) != null)
+      return;
+
+    // Otherwise, start the timer
+    if (DEBUG) {
+      timerId = startFakeTimer(responseChannel);
+    } else {
+      timerId = startSstoreTimer(responseChannel, type, id);
     }
 
-    ArrayList<Long> ids = activeClientTimers.get(remoteClient);
-    if (ids != null) {
-      ids.add(id);
-    } else {
-      ids = new ArrayList<>();
-      ids.add(id);
-      activeClientTimers.put(remoteClient, ids);
-    }
+    activeClientTimers.put(responseChannel, timerId);
+
+    // If the mapping doesn't exist, set it to zero, otherwise increment the value.
+    listenerCounts.merge(responseChannel, 1, (k,v) -> v++);
   }
 
-  private void startPeriodicNumericalQuery(String queryType, String responseChannel, String remoteClient) {
-    long id = 0L;
-    switch (queryType) {
-      case "hr":
-        id = vertx.setPeriodic(1000, t -> {
-          JsonObject json = new JsonObject();
-          json.put("x", System.currentTimeMillis() / 1000L);
-          json.put("y", rn.nextInt(200));
-          eb.send(responseChannel, json.encode());
-          System.out.println("Fired a timer: " + responseChannel);
-        });
-        break;
-      case "bp":
-        id = vertx.setPeriodic(1000, t -> {
-          JsonObject json = new JsonObject();
-          json.put("x", System.currentTimeMillis() / 1000L);
-          json.put("y", rn.nextInt(200));
-          eb.send(responseChannel, json.encode());
-        });
-        break;
-    }
+  private long startFakeTimer(String responseChannel) {
+    return vertx.setPeriodic(1000, t -> {
+      JsonObject json = new JsonObject();
+      json.put("x", System.currentTimeMillis());
+      json.put("y", rn.nextDouble() * 100);
+      eb.send(responseChannel, json);
+    });
+  }
 
-    ArrayList<Long> ids = activeClientTimers.get(remoteClient);
-    if (ids != null) {
-      ids.add(id);
-    } else {
-      ids = new ArrayList<>();
-      ids.add(id);
-      activeClientTimers.put(remoteClient, ids);
-    }
+  private long startSstoreTimer(String responseChannel, String queryType, String patientId) {
+    JsonObject outData = new JsonObject();
+    outData.put("channel", responseChannel).put("query", queryType).put("id", patientId);
+    return vertx.setPeriodic(1000, t -> eb.send("sstore", outData));
+  }
+
+  private void killTimer(String name) {
+    vertx.cancelTimer(activeClientTimers.get(name));
+    activeClientTimers.remove(name);
   }
 }
