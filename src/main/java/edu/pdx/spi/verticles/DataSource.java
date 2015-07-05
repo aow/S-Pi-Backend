@@ -71,9 +71,14 @@ public final class DataSource extends AbstractVerticle {
 
       String responseChannel = requestData.getString("type") + "." + requestData.getString("id");
 
-      startStreamingQuery(responseChannel, requestData.getString("tyoe"), requestData.getString("id"));
+      startStreamingQuery(responseChannel, requestData.getString("type"), requestData.getString("id"));
 
       m.reply(responseChannel);
+    });
+
+    eb.consumer("alertrequest", m -> {
+      startAlerts();
+      m.reply("alerts");
     });
 
     eb.consumer("ended", m -> {
@@ -89,6 +94,21 @@ public final class DataSource extends AbstractVerticle {
         });
       });
     });
+  }
+
+  private void startAlerts() {
+    long timerId;
+
+    if (activeClientTimers.get("alerts") != null) return;
+
+    if (DEBUG) {
+      timerId = startFakeAlertTimer();
+    } else {
+      timerId = startSstoreTimer("alerts", "alert", "1");
+    }
+
+    activeClientTimers.put("alerts", timerId);
+    listenerCounts.merge("alerts", 1, (k,v) -> v++);
   }
 
   private void startStreamingQuery(String responseChannel, String type, String id) {
@@ -109,6 +129,23 @@ public final class DataSource extends AbstractVerticle {
 
     // If the mapping doesn't exist, set it to zero, otherwise increment the value.
     listenerCounts.merge(responseChannel, 1, (k,v) -> v++);
+  }
+
+  private long startFakeAlertTimer() {
+    long id = vertx.setPeriodic(10000, t -> {
+      if (rn.nextBoolean()) {
+        JsonObject js = new JsonObject();
+        js.put("patient_id", rn.nextInt(5));
+        js.put("ts", System.currentTimeMillis());
+        js.put("signame", "blue");
+        js.put("interval", 2);
+        js.put("alert_msg", "It is an alert!");
+        js.put("action_msg", "Do something!");
+        eb.send("alerts", js);
+      }
+    });
+
+    return id;
   }
 
   private long startFakeTimer(String responseChannel) {

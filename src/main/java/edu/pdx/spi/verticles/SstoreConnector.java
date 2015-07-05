@@ -8,6 +8,7 @@ import io.vertx.core.json.JsonObject;
 import java.io.*;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.*;
 
 public class SstoreConnector extends AbstractVerticle {
   Socket socket;
@@ -41,26 +42,41 @@ public class SstoreConnector extends AbstractVerticle {
     eb = vertx.eventBus();
 
     eb.consumer("sstore", msg -> {
-      JsonObject jmsg = new JsonObject().mergeIn((JsonObject)msg.body());
+      JsonObject jmsg = (JsonObject)msg.body();
 
-      eb.send(jmsg.getString("channel"), query());
+      eb.send(jmsg.getString("channel"), query(jmsg.getString("query"), jmsg.getString("id")));
     });
   }
 
-  private JsonObject query() {
+  private JsonObject query(String type, String userId) {
     JsonObject resp = new JsonObject();
-    String queryText = new JsonObject().put("proc", "GetData").put("args", new JsonArray()).encode();
+    String queryText;
+    if (!type.equals("alert")) {
+      queryText = new JsonObject().put("proc", "GetData").put("args", new JsonArray()).encode();
+    } else {
+      JsonArray args = new JsonArray().add(Integer.valueOf(userId));
+      queryText = new JsonObject().put("proc", "GetRecentAlerts").put("args", args).encode();
+    }
     System.out.println("Sending: " + queryText);
     socketWriter.println(queryText);
     System.out.println("Sent query.");
 
     try {
       String response = socketReader.readLine();
-      resp = new JsonObject(response);
+      System.out.println(response);
+      if (!type.equals("alert")) {
+        JsonArray unsorted = new JsonObject(response).getJsonArray("data");
+        Collections.sort(unsorted.getList(), comp);
+        resp = new JsonObject(response).put("data", unsorted);
+      } else {
+        resp = new JsonObject(response);
+      }
     } catch (IOException e) {
       System.out.println("Error reading from socket: " + e.getMessage());
     }
 
     return resp;
   }
+
+  Comparator<LinkedHashMap<String, Object>> comp = (o1, o2) -> Integer.compare((Integer)o1.get("TS"), (Integer)o2.get("TS"));
 }
