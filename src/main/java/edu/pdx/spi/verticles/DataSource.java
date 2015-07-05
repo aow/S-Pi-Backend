@@ -77,7 +77,7 @@ public final class DataSource extends AbstractVerticle {
     });
 
     eb.consumer("alertrequest", m -> {
-      startAlerts();
+      startAlerts((String)m.body());
       m.reply("alerts");
     });
 
@@ -96,7 +96,7 @@ public final class DataSource extends AbstractVerticle {
     });
   }
 
-  private void startAlerts() {
+  private void startAlerts(String id) {
     long timerId;
 
     if (activeClientTimers.get("alerts") != null) return;
@@ -104,7 +104,7 @@ public final class DataSource extends AbstractVerticle {
     if (DEBUG) {
       timerId = startFakeAlertTimer();
     } else {
-      timerId = startSstoreTimer("alerts", "alert", "1");
+      timerId = startSstoreTimer("alerts", "alert", id);
     }
 
     activeClientTimers.put("alerts", timerId);

@@ -43,7 +43,7 @@ public class Server extends AbstractVerticle {
     router.route("/patients").handler(ph);
 
     // Alerts
-    router.route("/alerts").handler(new AlertMonitorHandler());
+    router.route("/alerts/:id").handler(new AlertMonitorHandler());
 
     // Numerical stream endpoints
     StreamingHandler streamHandle = new StreamingHandler();
