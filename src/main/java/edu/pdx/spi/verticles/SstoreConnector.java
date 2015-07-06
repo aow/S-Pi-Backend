@@ -44,7 +44,7 @@ public class SstoreConnector extends AbstractVerticle {
     eb.consumer("sstore", msg -> {
       JsonObject jmsg = (JsonObject)msg.body();
 
-      eb.send(jmsg.getString("channel"), query(jmsg.getString("query"), jmsg.getString("id")));
+      eb.publish(jmsg.getString("channel"), query(jmsg.getString("query"), jmsg.getString("id")));
     });
   }
 
