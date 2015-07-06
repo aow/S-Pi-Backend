@@ -63,13 +63,9 @@ public class Server extends AbstractVerticle {
           break;
         case SOCKET_CLOSED:
           System.out.println("Socket closed.");
-          JsonObject js = new JsonObject()
-              .put("channels",
-                  new JsonArray(new ArrayList<String>(event.socket().webSession().data().keySet())));
-          eb.send("ended", js);
+          eb.send("ended", event.socket().headers().get("X-Real-IP"));
           break;
         case RECEIVE:
-          event.socket().webSession().data().putIfAbsent(event.rawMessage().getString("address"), 1);
           break;
         case SEND:
           break;

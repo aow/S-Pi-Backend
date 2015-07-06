@@ -4,11 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.pdx.spi.fakedata.models.Patient;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.eventbus.EventBus;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 
 final class Patients {
   Map<Integer, Patient> patients = new HashMap<>();
@@ -36,6 +35,8 @@ public final class DataSource extends AbstractVerticle {
   EventBus eb;
   Map<String, Long> activeClientTimers;
   Map<String, Integer> listenerCounts;
+  Map<String, List<String>> clientChannels;
+  Map<String, List<String>> activeListeners;
   boolean DEBUG;
 
   public void start() {
@@ -44,6 +45,8 @@ public final class DataSource extends AbstractVerticle {
     eb = vertx.eventBus();
     activeClientTimers = new HashMap<>();
     listenerCounts = new HashMap<>();
+    clientChannels = new HashMap<>();
+    activeListeners = new HashMap<>();
 
     eb.consumer("patients", m -> {
       if (((String) m.body()).isEmpty()) {
@@ -71,52 +74,64 @@ public final class DataSource extends AbstractVerticle {
 
       String responseChannel = requestData.getString("type") + "." + requestData.getString("id");
 
-      startStreamingQuery(responseChannel, requestData.getString("type"), requestData.getString("id"));
+      startStreamingQuery(responseChannel, requestData.getString("type"), requestData.getString("id"), requestData.getString("ip"));
 
       m.reply(responseChannel);
     });
 
     eb.consumer("alertrequest", m -> {
-      startAlerts((String)m.body());
+      JsonObject req = (JsonObject) m.body();
+      startAlerts("alerts", req.getString("id"), req.getString("ip"));
       m.reply("alerts");
     });
 
     eb.consumer("ended", m -> {
-      JsonObject data = (JsonObject) m.body();
-      data.getJsonArray("channels").forEach((k) -> {
-        listenerCounts.computeIfPresent((String) k, (x, y) -> {
-          y -= y;
-          if (y <= 0) {
-            killTimer(x);
-            return null;
-          }
-          return y;
-        });
+      activeListeners.entrySet().forEach(e -> {
+        e.getValue().remove(m.body());
+        if (e.getValue().isEmpty()) {
+          killTimer(e.getKey());
+        }
       });
+      activeListeners.entrySet().removeIf(e -> e.getValue().isEmpty());
     });
   }
 
-  private void startAlerts(String id) {
+  private void startAlerts(String responseChannel, String id, String ip) {
     long timerId;
 
-    if (activeClientTimers.get("alerts") != null) return;
+    if (activeClientTimers.get(responseChannel) != null) {
+      activeListeners.compute(responseChannel, (k,v) -> {
+        v.add(ip);
+        return v;
+      });
+      return;
+    }
 
     if (DEBUG) {
       timerId = startFakeAlertTimer();
     } else {
-      timerId = startSstoreTimer("alerts", "alert", id);
+      timerId = startSstoreTimer(responseChannel, "alert", id);
     }
 
-    activeClientTimers.put("alerts", timerId);
-    listenerCounts.merge("alerts", 1, (k,v) -> v++);
+    activeClientTimers.put(responseChannel, timerId);
+    activeListeners.compute(responseChannel, (k,v) -> {
+      if (v == null) v = new ArrayList<>();
+      v.add(ip);
+      return v;
+    });
   }
 
-  private void startStreamingQuery(String responseChannel, String type, String id) {
+  private void startStreamingQuery(String responseChannel, String type, String id, String ip) {
     long timerId;
 
-    // If an entry exists, there is a timer running already, so just do no work
-    if (activeClientTimers.get(responseChannel) != null)
+    // If an entry exists, there is a timer running already, so just add the ip for tracking
+    if (activeClientTimers.get(responseChannel) != null) {
+      activeListeners.compute(responseChannel, (k,v) -> {
+        v.add(ip);
+        return v;
+      });
       return;
+    }
 
     // Otherwise, start the timer
     if (DEBUG) {
@@ -127,8 +142,12 @@ public final class DataSource extends AbstractVerticle {
 
     activeClientTimers.put(responseChannel, timerId);
 
-    // If the mapping doesn't exist, set it to zero, otherwise increment the value.
-    listenerCounts.merge(responseChannel, 1, (k,v) -> v++);
+    // If the mapping doesn't exist, set it to one, otherwise increment the value.
+    activeListeners.compute(responseChannel, (k,v) -> {
+      if (v == null) v = new ArrayList<>();
+      v.add(ip);
+      return v;
+    });
   }
 
   private long startFakeAlertTimer() {
@@ -141,7 +160,7 @@ public final class DataSource extends AbstractVerticle {
         js.put("interval", 2);
         js.put("alert_msg", "It is an alert!");
         js.put("action_msg", "Do something!");
-        eb.send("alerts", js);
+        eb.publish("alerts", js);
       }
     });
 
@@ -150,10 +169,17 @@ public final class DataSource extends AbstractVerticle {
 
   private long startFakeTimer(String responseChannel) {
     return vertx.setPeriodic(1000, t -> {
-      JsonObject json = new JsonObject();
-      json.put("x", System.currentTimeMillis());
-      json.put("y", rn.nextDouble() * 100);
-      eb.send(responseChannel, json);
+      long startTime = System.currentTimeMillis();
+      JsonObject data = new JsonObject();
+      JsonArray jsa = new JsonArray();
+      for (int i = 0; i < 125; i++) {
+        JsonObject json = new JsonObject();
+        json.put("TS", startTime + 8*i);
+        json.put("SIGNAL", Math.abs(rn.nextGaussian()) * 25);
+        jsa.add(json);
+      }
+      data.put("data", jsa);
+      eb.publish(responseChannel, data);
     });
   }
 
