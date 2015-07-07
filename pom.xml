@@ -14,6 +14,17 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
+  <!--<repositories>-->
+    <!--<repository>-->
+      <!--<id>AndroidSupport</id>-->
+      <!--<url>https://github.com/weisensee/AndroidSupport/tree/master/extras/android/</url>-->
+      <!--<snapshots>-->
+        <!--<enabled>true</enabled>-->
+        <!--<updatePolicy>daily</updatePolicy>-->
+      <!--</snapshots>-->
+    <!--</repository>-->
+  <!--</repositories>-->
+
   <dependencies>
     <dependency>
       <groupId>junit</groupId>
@@ -45,6 +56,22 @@
       <artifactId>vertx-unit</artifactId>
       <version>3.0.0</version>
     </dependency>
+
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>2.4</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.json</groupId>
+      <artifactId>json</artifactId>
+      <version>20070829</version>
+    </dependency>
+
+    <!--org.apache.commons.io.IOUtils;-->
+    <!--org.json.JSONArray;-->
+    <!--org.json.JSONObject;-->
   </dependencies>
 
   <build>

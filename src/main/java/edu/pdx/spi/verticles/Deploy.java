@@ -9,5 +9,6 @@ public class Deploy extends AbstractVerticle {
 
     vertx.deployVerticle("edu.pdx.spi.verticles.DataSource");
     vertx.deployVerticle("edu.pdx.spi.verticles.Server");
+    vertx.deployVerticle("edu.pdx.spi.verticles.Alerts");
   }
 }
