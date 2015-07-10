@@ -5,7 +5,7 @@ import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
 
-public class StreamingNumericalHandler implements Handler<RoutingContext> {
+public class AlertMonitorHandler implements Handler<RoutingContext> {
   EventBus eb;
   JsonObject js;
 
@@ -13,11 +13,11 @@ public class StreamingNumericalHandler implements Handler<RoutingContext> {
     eb = rc.vertx().eventBus();
     js = new JsonObject();
 
-    js.put("type", rc.request().getParam("type"));
+    js.put("ip", rc.request().headers().get("X-Real-IP"));
     js.put("id", rc.request().getParam("id"));
-    js.put("remoteclient", rc.request().remoteAddress().host());
-    eb.send("numericalrequest", js.encode(), m -> {
-      rc.response().end((String) m.result().body());
+
+    eb.send("alertrequest", js, m -> {
+      rc.response().end((String)m.result().body());
     });
   }
 }
