@@ -58,7 +58,6 @@
     </dependency>
 
     <dependency>
-<<<<<<< HEAD
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
       <version>2.4</version>
@@ -70,15 +69,11 @@
       <version>20070829</version>
     </dependency>
 
-    <!--org.apache.commons.io.IOUtils;-->
-    <!--org.json.JSONArray;-->
-    <!--org.json.JSONObject;-->
-=======
+    <dependency>
       <groupId>com.beust</groupId>
       <artifactId>jcommander</artifactId>
       <version>1.30</version>
     </dependency>
->>>>>>> 3006ebe918c2dc96aa965fb9c9a75e49204376a8
   </dependencies>
 
   <build>
