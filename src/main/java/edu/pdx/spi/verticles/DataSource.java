@@ -13,10 +13,10 @@ final class Patients {
   Map<Integer, Patient> patients = new HashMap<>();
 
   public Patients() {
-    patients.put(1, new Patient(1, 100, "Jane", "Doe"));
-    patients.put(2, new Patient(2, 101, "John", "Doe"));
-    patients.put(3, new Patient(3, 102, "Lego", "Man"));
-    patients.put(4, new Patient(4, 103, "Suzy", "Doe"));
+    patients.put(1, new Patient(1));
+    patients.put(2, new Patient(2));
+    patients.put(3, new Patient(3));
+    patients.put(4, new Patient(4));
   }
 
   public Patient getPatient(int id) {
@@ -49,7 +49,7 @@ public final class DataSource extends AbstractVerticle {
         try {
           m.reply(om.writeValueAsString(patientData.getAllPatients()));
         } catch (Exception e) {
-          m.reply("error parsing patient data");
+          m.reply("error parsing patient data" + e.getMessage());
         }
       } else {
         Patient p = patientData.getPatient(Integer.parseInt((String) m.body()));
