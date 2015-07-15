@@ -154,7 +154,7 @@ public final class DataSource extends AbstractVerticle {
     long id = vertx.setPeriodic(10000, t -> {
       if (rn.nextBoolean()) {
         JsonObject js = new JsonObject();
-        js.put("patient_id", rn.nextInt(5));
+        js.put("patient_id", rn.nextInt(4));
         js.put("ts", System.currentTimeMillis());
         js.put("signame", "blue");
         js.put("interval", 2);
