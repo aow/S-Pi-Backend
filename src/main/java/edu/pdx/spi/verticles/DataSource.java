@@ -99,7 +99,7 @@ public final class DataSource extends AbstractVerticle {
   private void startAlerts(String responseChannel, String id, String ip) {
     long timerId;
 
-    if (activeClientTimers.get(responseChannel) != null) {
+    if (Objects.nonNull(activeClientTimers.get(responseChannel))) {
       activeListeners.compute(responseChannel, (k,v) -> {
         v.add(ip);
         return v;
@@ -115,7 +115,7 @@ public final class DataSource extends AbstractVerticle {
 
     activeClientTimers.put(responseChannel, timerId);
     activeListeners.compute(responseChannel, (k,v) -> {
-      if (v == null) v = new ArrayList<>();
+      if (Objects.isNull(v)) v = new ArrayList<>();
       v.add(ip);
       return v;
     });
@@ -125,7 +125,7 @@ public final class DataSource extends AbstractVerticle {
     long timerId;
 
     // If an entry exists, there is a timer running already, so just add the ip for tracking
-    if (activeClientTimers.get(responseChannel) != null) {
+    if (Objects.nonNull(activeClientTimers.get(responseChannel))) {
       activeListeners.compute(responseChannel, (k,v) -> {
         v.add(ip);
         return v;
@@ -144,7 +144,7 @@ public final class DataSource extends AbstractVerticle {
 
     // If the mapping doesn't exist, set it to one, otherwise increment the value.
     activeListeners.compute(responseChannel, (k,v) -> {
-      if (v == null) v = new ArrayList<>();
+      if (Objects.isNull(v)) v = new ArrayList<>();
       v.add(ip);
       return v;
     });
