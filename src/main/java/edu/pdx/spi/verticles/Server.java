@@ -63,6 +63,7 @@ public class Server extends AbstractVerticle {
           break;
         case SOCKET_CLOSED:
           System.out.println("Socket closed.");
+          // Socket got closed, trigger the end event.
           eb.send("ended", event.socket().headers().get("X-Real-IP"));
           break;
         case RECEIVE:

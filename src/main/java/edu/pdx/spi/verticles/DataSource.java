@@ -82,17 +82,24 @@ public final class DataSource extends AbstractVerticle {
     });
 
     eb.consumer("ended", m -> {
+      // For every channel's listener list
       activeListeners.entrySet().forEach(e -> {
+        // Try and remove a single count for the IP that just disconnected
+        // Don't remove all instances, as the client can have multiple windows open
         e.getValue().remove(m.body());
+        // If the client list is empty, that means the channel is no longer needed
         if (e.getValue().isEmpty()) {
+          // So kill the timer
           killTimer(e.getKey());
         }
       });
+      // Then clear out the reference to it in the cache.
       activeListeners.entrySet().removeIf(e -> e.getValue().isEmpty());
     });
   }
 
   private void startAlerts(String responseChannel, String id, String ip) {
+    // Same deal as startStreamingQuery.
     long timerId;
 
     if (Objects.nonNull(activeClientTimers.get(responseChannel))) {
@@ -136,9 +143,10 @@ public final class DataSource extends AbstractVerticle {
       timerId = startSstoreTimer(responseChannel, type, id);
     }
 
+    // And store the reference to the timer for caching
     activeClientTimers.put(responseChannel, timerId);
 
-    // If the mapping doesn't exist, set it to one, otherwise increment the value.
+    // Then init the array and add the ip for tracking activity
     activeListeners.compute(responseChannel, (k,v) -> {
       if (Objects.isNull(v)) v = new ArrayList<>();
       v.add(ip);
