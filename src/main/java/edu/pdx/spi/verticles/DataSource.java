@@ -34,8 +34,6 @@ public final class DataSource extends AbstractVerticle {
   Random rn;
   EventBus eb;
   Map<String, Long> activeClientTimers;
-  Map<String, Integer> listenerCounts;
-  Map<String, List<String>> clientChannels;
   Map<String, List<String>> activeListeners;
   boolean DEBUG;
 
@@ -44,8 +42,6 @@ public final class DataSource extends AbstractVerticle {
     rn = new Random();
     eb = vertx.eventBus();
     activeClientTimers = new HashMap<>();
-    listenerCounts = new HashMap<>();
-    clientChannels = new HashMap<>();
     activeListeners = new HashMap<>();
 
     eb.consumer("patients", m -> {
