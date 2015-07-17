@@ -51,6 +51,8 @@ public class SstoreConnector extends AbstractVerticle {
   private JsonObject query(String type, String userId) {
     JsonObject resp = new JsonObject();
     String queryText;
+    // Figure out which query to run.
+    //TODO: Fix this for more query types once they are added.
     if (!type.equals("alert")) {
       queryText = new JsonObject().put("proc", "GetData").put("args", new JsonArray()).encode();
     } else {
@@ -66,6 +68,7 @@ public class SstoreConnector extends AbstractVerticle {
       System.out.println(response);
       if (!type.equals("alert")) {
         JsonArray unsorted = new JsonObject(response).getJsonArray("data");
+        // Sort the timestamps. Temp solution until s-store returns the data presorted.
         Collections.sort(unsorted.getList(), comp);
         resp = new JsonObject(response).put("data", unsorted);
       } else {
@@ -77,6 +80,5 @@ public class SstoreConnector extends AbstractVerticle {
 
     return resp;
   }
-
   Comparator<LinkedHashMap<String, Object>> comp = (o1, o2) -> Integer.compare((Integer)o1.get("TS"), (Integer)o2.get("TS"));
 }
