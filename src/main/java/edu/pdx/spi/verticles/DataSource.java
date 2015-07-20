@@ -1,5 +1,7 @@
 package edu.pdx.spi.verticles;
 
+import static edu.pdx.spi.ChannelNames.*;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.pdx.spi.fakedata.models.Patient;
 import io.vertx.core.AbstractVerticle;
@@ -35,10 +37,12 @@ public final class DataSource extends AbstractVerticle {
   EventBus eb;
   Map<String, Long> activeClientTimers;
   Map<String, List<String>> activeListeners;
-  boolean DEBUG;
+  boolean SSTORE;
+  boolean BD;
 
   public void start() {
-    DEBUG = this.config().getBoolean("debug");
+    SSTORE = this.config().getBoolean("sstore");
+    BD = this.config().getBoolean("bigDawg");
     rn = new Random();
     eb = vertx.eventBus();
     activeClientTimers = new HashMap<>();
@@ -115,7 +119,7 @@ public final class DataSource extends AbstractVerticle {
 
   private void startAlerts(String responseChannel, String id, String ip) {
     // Same deal as startStreamingQuery.
-    long timerId;
+    long timerId = 1L;
 
     if (Objects.nonNull(activeClientTimers.get(responseChannel))) {
       activeListeners.compute(responseChannel, (k,v) -> {
@@ -125,10 +129,15 @@ public final class DataSource extends AbstractVerticle {
       return;
     }
 
-    if (DEBUG) {
-      timerId = startFakeAlertTimer();
-    } else {
+    if (BD) {
+      //TODO: do something here for bigdawg alerts
+      throw new RuntimeException("BigDawg is not implemented yet.");
+    } else if (SSTORE) {
+      //TODO: Don't think this needs to be here anymore, but good to implement in case of future need.
       timerId = startSstoreTimer(responseChannel, "alert", id);
+    } else {
+      // Local alerts
+      timerId = startFakeAlertTimer();
     }
 
     activeClientTimers.put(responseChannel, timerId);
@@ -152,10 +161,10 @@ public final class DataSource extends AbstractVerticle {
     }
 
     // Otherwise, start the timer
-    if (DEBUG) {
-      timerId = startFakeTimer(responseChannel);
-    } else {
+    if (SSTORE) {
       timerId = startSstoreTimer(responseChannel, type, id);
+    } else {
+      timerId = startFakeTimer(responseChannel);
     }
 
     // And store the reference to the timer for caching

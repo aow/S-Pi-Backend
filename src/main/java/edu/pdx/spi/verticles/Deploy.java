@@ -10,7 +10,7 @@ public class Deploy extends AbstractVerticle {
     DeploymentOptions workerOptions = new DeploymentOptions().setWorker(true).setConfig(this.config());
     DeploymentOptions normalOptions = new DeploymentOptions().setConfig(this.config());
 
-    if (!this.config().getBoolean("debug")) {
+    if (this.config().getBoolean("sstore")) {
       vertx.deployVerticle("edu.pdx.spi.verticles.SstoreConnector", workerOptions);
     }
 

@@ -1,53 +1,87 @@
 package edu.pdx.spi;
 
-import com.beust.jcommander.JCommander;
-import com.beust.jcommander.Parameter;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.pdx.spi.verticles.Deploy;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Verticle;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 
-class RuntimeOptions {
-  public boolean isDebug() {
-    return debug;
+import java.io.IOException;
+import java.nio.file.*;
+
+
+final class Options {
+  @JsonProperty
+  String vertxHost;
+  @JsonProperty
+  Integer vertxPort;
+  @JsonProperty
+  Boolean sstore;
+  @JsonProperty
+  String sstoreClientHost;
+  @JsonProperty
+  Integer sstoreClientPort;
+  @JsonProperty
+  Boolean bigDawg;
+  @JsonProperty
+  String bigDawgUrl;
+
+  public Options() {
+    this.vertxHost = "localhost";
+    this.vertxPort = 9999;
+    this.sstore = false;
+    this.sstoreClientHost = "localhost";
+    this.sstoreClientPort = 6000;
+    this.bigDawg = false;
+    this.bigDawgUrl = "";
   }
 
-  public String getHostname() {
-    return hostname;
+  @Override
+  public String toString() {
+    return "Options{" +
+        "vertxHost='" + vertxHost + '\'' +
+        ", vertxPort=" + vertxPort +
+        ", sstore=" + sstore +
+        ", sstoreClientHost='" + sstoreClientHost + '\'' +
+        ", sstoreClientPort=" + sstoreClientPort +
+        ", bigDawg=" + bigDawg +
+        ", bigDawgUrl='" + bigDawgUrl + '\'' +
+        '}';
   }
-
-  public int getPort() {
-    return port;
-  }
-
-  @Parameter(names = "-debug", description = "Enable debug mode, which doesn't use S-Store")
-  private boolean debug = false;
-
-  @Parameter(names = "-host", description = "Change the hostname to listen on, default is localhost")
-  private String hostname = "localhost";
-
-  @Parameter(names = "-port", description = "Change the port, default is 9999")
-  private int port = 9999;
 }
 
 public class Runner {
 
   public static void main(final String... args) {
-    JsonObject vertxConfig = new JsonObject();
+    ObjectMapper om = new ObjectMapper();
     DeploymentOptions deploymentOptions = new DeploymentOptions();
+    Options options = null;
+
+    Path configFile = Paths.get("settings.json");
+
+    if (Files.exists(configFile)) {
+      System.out.println("Found config");
+      try {
+        options = om.readValue(Files.readAllBytes(configFile), Options.class);
+        System.out.println(options);
+      } catch (IOException e) {
+        System.out.println("Error reading from local config. Using default.");
+      }
+    } else {
+      options = new Options();
+    }
 
     Vertx vtx = Vertx.vertx();
     Verticle deploy = new Deploy();
 
-    RuntimeOptions clOptions = new RuntimeOptions();
-    new JCommander(clOptions, args);
-
-    vertxConfig.put("debug", clOptions.isDebug())
-        .put("hostname", clOptions.getHostname())
-        .put("port", clOptions.getPort());
-
     System.out.println("Starting deployment...");
-    vtx.deployVerticle(deploy, deploymentOptions.setConfig(vertxConfig));
+    try {
+      vtx.deployVerticle(deploy, deploymentOptions.setConfig(new JsonObject(om.writeValueAsString(options))));
+    } catch (JsonProcessingException e) {
+      System.out.println(e);
+    }
   }
 }

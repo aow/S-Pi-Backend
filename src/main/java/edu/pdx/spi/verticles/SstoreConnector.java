@@ -21,7 +21,7 @@ public class SstoreConnector extends AbstractVerticle {
   @Override
   public void start() {
     try {
-      socket = new Socket("localhost", 6000);
+      socket = new Socket(this.config().getString("sstoreClientHost"), this.config().getInteger("sstoreClientPort"));
       System.out.println("Connected to S-Store client.");
     } catch (UnknownHostException e) {
       throw new RuntimeException("Error resolving S-Store client hostname: " + e.getMessage());
