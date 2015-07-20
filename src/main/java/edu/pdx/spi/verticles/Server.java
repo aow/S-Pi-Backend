@@ -8,9 +8,10 @@ import io.vertx.core.http.HttpMethod;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
+import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.CookieHandler;
 import io.vertx.ext.web.handler.CorsHandler;
-
+import static edu.pdx.spi.ChannelNames.*;
 import edu.pdx.spi.handlers.PatientsHandler;
 import io.vertx.ext.web.handler.SessionHandler;
 import io.vertx.ext.web.handler.sockjs.BridgeOptions;
@@ -64,7 +65,7 @@ public class Server extends AbstractVerticle {
         case SOCKET_CLOSED:
           System.out.println("Socket closed.");
           // Socket got closed, trigger the end event.
-          eb.send("ended", event.socket().headers().get("X-Real-IP"));
+          eb.send(STREAM_END, event.socket().headers().get("X-Real-IP"));
           break;
         case RECEIVE:
           break;

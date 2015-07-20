@@ -65,23 +65,38 @@ public final class DataSource extends AbstractVerticle {
       }
     });
 
-    eb.consumer("streamrequest", m -> {
+    registerStreamRequestEventBusHandler();
+    registerAlertsRequestEventBusHandler();
+    registerTerminateStreamSessionEventBusHandler();
+  }
+
+  /**
+   *  Listens for requests for streams and handles setting up the response channel
+   *  as well as starting the stream itself. Replies with the requested stream's outgoing
+   *  channel.
+   */
+  private void registerStreamRequestEventBusHandler() {
+    eb.consumer(WAVEFORM_REQ, m-> {
       JsonObject requestData = (JsonObject) m.body();
+      String type = requestData.getString("type");
+      String id = requestData.getString("id");
 
-      String responseChannel = requestData.getString("type") + "." + requestData.getString("id");
-
-      startStreamingQuery(responseChannel, requestData.getString("type"), requestData.getString("id"), requestData.getString("ip"));
-
+      String responseChannel = type + "." + id;
+      startStreamingQuery(responseChannel, type, id, requestData.getString("ip"));
       m.reply(responseChannel);
     });
+  }
 
-    eb.consumer("alertrequest", m -> {
+  private void registerAlertsRequestEventBusHandler() {
+    eb.consumer(ALERTS_REQ, m -> {
       JsonObject req = (JsonObject) m.body();
       startAlerts("alerts", req.getString("id"), req.getString("ip"));
       m.reply("alerts");
     });
+  }
 
-    eb.consumer("ended", m -> {
+  private void registerTerminateStreamSessionEventBusHandler() {
+    eb.consumer(STREAM_END, m -> {
       // For every channel's listener list
       activeListeners.entrySet().forEach(e -> {
         // Try and remove a single count for the IP that just disconnected
