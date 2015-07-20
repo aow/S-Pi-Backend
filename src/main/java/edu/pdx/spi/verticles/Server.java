@@ -27,15 +27,13 @@ public class Server extends AbstractVerticle {
 
   @Override
   public void start() {
-    int port = this.config().getInteger("port");
-    String hostname = this.config().getString("hostname");
+    int port = this.config().getInteger("vertxPort");
+    String hostname = this.config().getString("vertxHost");
 
-    SessionStore sessStore = LocalSessionStore.create(vertx);
 
     Router router = Router.router(vertx);
     router.route().handler(CorsHandler.create("*").allowedMethod(HttpMethod.GET));
-    router.route().handler(CookieHandler.create());
-    router.route().handler(SessionHandler.create(sessStore).setNagHttps(false).setSessionCookieName("cook"));
+    router.route().handler(BodyHandler.create());
     eb = vertx.eventBus();
 
     // Patient data routes
@@ -44,7 +42,10 @@ public class Server extends AbstractVerticle {
     router.route("/patients").handler(ph);
 
     // Alerts
-    router.route("/alerts/:id").handler(new AlertMonitorHandler());
+    AlertMonitorHandler ah = new AlertMonitorHandler();
+    router.route("/alerts/:id").handler(ah);
+    // Route for handling BigDawg posted replies
+    router.post("/alerts/incoming").handler(ah);
 
     // Numerical stream endpoints
     StreamingHandler streamHandle = new StreamingHandler();
