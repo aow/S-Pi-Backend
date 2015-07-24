@@ -14,17 +14,6 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
-  <!--<repositories>-->
-    <!--<repository>-->
-      <!--<id>AndroidSupport</id>-->
-      <!--<url>https://github.com/weisensee/AndroidSupport/tree/master/extras/android/</url>-->
-      <!--<snapshots>-->
-        <!--<enabled>true</enabled>-->
-        <!--<updatePolicy>daily</updatePolicy>-->
-      <!--</snapshots>-->
-    <!--</repository>-->
-  <!--</repositories>-->
-
   <dependencies>
     <dependency>
       <groupId>junit</groupId>
