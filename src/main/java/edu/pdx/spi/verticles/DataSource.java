@@ -94,8 +94,9 @@ public final class DataSource extends AbstractVerticle {
   private void registerAlertsRequestEventBusHandler() {
     eb.consumer(ALERTS_REQ, m -> {
       JsonObject req = (JsonObject) m.body();
-      startAlerts("alerts", req.getString("id"), req.getString("ip"));
-      m.reply("alerts");
+      String responseChannel = "alerts" + "." + req.getString("id");
+      startAlerts(responseChannel, req.getString("id"), req.getString("ip"));
+      m.reply(responseChannel);
     });
   }
 
@@ -131,13 +132,14 @@ public final class DataSource extends AbstractVerticle {
 
     if (BD) {
       //TODO: do something here for bigdawg alerts
+      // Our routes that BigDawg will post back to should be in the form /alerts/incoming/[patientid]
       throw new RuntimeException("BigDawg is not implemented yet.");
     } else if (SSTORE) {
       //TODO: Don't think this needs to be here anymore, but good to implement in case of future need.
       timerId = startSstoreTimer(responseChannel, "alert", id);
     } else {
       // Local alerts
-      timerId = startFakeAlertTimer();
+      timerId = startFakeAlertTimer(responseChannel);
     }
 
     activeClientTimers.put(responseChannel, timerId);
@@ -178,7 +180,7 @@ public final class DataSource extends AbstractVerticle {
     });
   }
 
-  private long startFakeAlertTimer() {
+  private long startFakeAlertTimer(String responseChannel) {
     long id = vertx.setPeriodic(10000, t -> {
       if (rn.nextBoolean()) {
         JsonObject js = new JsonObject();
@@ -188,7 +190,7 @@ public final class DataSource extends AbstractVerticle {
         js.put("interval", 2);
         js.put("alert_msg", "It is an alert!");
         js.put("action_msg", "Do something!");
-        eb.publish("alerts", js);
+        eb.publish(responseChannel, js);
       }
     });
 
@@ -214,7 +216,7 @@ public final class DataSource extends AbstractVerticle {
   private long startSstoreTimer(String responseChannel, String queryType, String patientId) {
     JsonObject outData = new JsonObject();
     outData.put("channel", responseChannel).put("query", queryType).put("id", patientId);
-    return vertx.setPeriodic(1000, t -> eb.send("sstore", outData));
+    return vertx.setPeriodic(1000, t -> eb.publish("sstore", outData));
   }
 
   private void killTimer(String name) {
