@@ -47,6 +47,80 @@ The default values are those listed, and if no config file is present and overri
 
 `bigDawgUrl`: The BigDawg URL we submit queries to.
 
+# Integrating with the frontend
+
+## Deploying with the frontend
+
+1. Follow the instruction above for building, so you have the jar file.
+2. Clone the S-Pi-Web repo into a directory.
+3. Have Nginx installed.
+4. Create 2 nginx virtual servers with the following configs. The API config is optional and only needed if you want to run vertx locally and not query off the main API we are hosting.
+
+```
+# API config
+server {
+        listen 80;
+        # The api doesn't need the root, as it doesn't serve any html.
+        root /var/www/html/api;
+        # You'll want to change this to some local domain.
+        server_name api.s-pi-demo.com;
+
+        location / {
+                proxy_set_header        X-Real-IP       $remote_addr;
+                proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+                proxy_set_header Host $host;
+                # Change this if you run vertx on a different port/host.
+                proxy_pass http://localhost:9999/;
+        }
+}
+
+```
+
+```
+# HTML config
+server {
+        listen 80;
+        # Make this the path to where you cloned S-Pi-Web
+        root /var/www/html/S-Pi-Web;
+        index overview.html;
+        # Change this to something local.
+        server_name s-pi-demo.com;
+
+        location / {
+                try_files $uri $uri/ =404;
+        }
+}
+
+```
+
+5. If you are running vert.x locally, you'll need to edit the frontend's code in overview.html and patient.html. Look for the call to `var eb = new vertx.EventBus("http://api.s-pi-demo.com/streambus")` and replace the `api.s-pi-demo.com` portion to the `server_name` you set in the nginx config.
+6. Hopefully everything should work now.
+
+## Developing for the frontend
+
+You need to include https://github.com/vert-x3/vertx-web/blob/3.0.0/src/client/vertxbus.js library.
+
+After that, you connect with the eventbus by doing `var eb = new vertx.EventBus("http://.../streambus")`, where the ... is whatever hostname the vertx server is listening on. You only need one EventBus connection.
+
+Once that is set up, whenever you need to start streaming data, simply issue an AJAX request to the previous endpoints. They return the channel you have to listen on to get the streaming data. You use that as follows:
+
+```
+eb.registerHandler(channelName, function(msg) {
+  // do something with the data in msg. right now the server only returns x,y pairs.
+  var dmsg = JSON.parse(msg);
+  console.log("got a message: " + dmsg.x + ", " + dmsg.y);
+  }
+```
+This will register a callback that is run whenever a message on that channel is received over the eventbus.
+
+Recommended reading:
+http://vertx.io/docs/vertx-core/java/#event_bus
+
+http://vertx.io/docs/vertx-web/java/#_sockjs_event_bus_bridge
+
 # Current available REST queries
 ## Clinical data
 #### GET /patients
@@ -177,73 +251,3 @@ The default values are those listed, and if no config file is present and overri
 ### Server specific stuff
 
 /streambus - The eventbus endpoint that you connect to.
-
-# Integrating with the frontend
-
-## Deploying with the frontend
-
-1. Follow the instruction above for building, so you have the jar file.
-2. Clone the S-Pi-Web repo into a directory.
-3. Have Nginx installed.
-4. Create 2 nginx virtual servers with the following configs. The API config is optional and only needed if you want to run vertx locally and not query off the main API we are hosting.
-
-```
-# API config
-server {
-        listen 80;
-        # The api doesn't need the root, as it doesn't serve any html.
-        root /var/www/html/api;
-        # You'll want to change this to some local domain.
-        server_name api.s-pi-demo.com;
-
-        location / {
-                proxy_set_header        X-Real-IP       $remote_addr;
-                proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_http_version 1.1;
-                proxy_set_header Upgrade $http_upgrade;
-                proxy_set_header Connection "upgrade";
-                proxy_set_header Host $host;
-                # Change this if you run vertx on a different port/host.
-                proxy_pass http://localhost:9999/;
-        }
-}
-
-```
-
-```
-# HTML config
-server {
-        listen 80;
-        # Make this the path to where you cloned S-Pi-Web
-        root /var/www/html/S-Pi-Web;
-        index overview.html;
-        # Change this to something local.
-        server_name s-pi-demo.com;
-
-        location / {
-                try_files $uri $uri/ =404;
-        }
-}
-
-```
-
-5. If you are running vert.x locally, you'll need to edit the frontend's code in overview.html and patient.html. Look for the call to `var eb = new vertx.EventBus("http://api.s-pi-demo.com/streambus")` and replace the `api.s-pi-demo.com` portion to the `server_name` you set in the nginx config.
-6. Hopefully everything should work now.
-
-## Developing for the frontend
-
-You need to include https://github.com/vert-x3/vertx-web/blob/3.0.0/src/client/vertxbus.js library.
-
-After that, you connect with the eventbus by doing `var eb = new vertx.EventBus("http://.../streambus")`, where the ... is whatever hostname the vertx server is listening on. You only need one EventBus connection.
-
-Once that is set up, whenever you need to start streaming data, simply issue an AJAX request to the previous endpoints. They return the channel you have to listen on to get the streaming data. You use that as follows:
-
-```
-eb.registerHandler(channelName, function(msg) {
-  // do something with the data in msg. right now the server only returns x,y pairs.
-  var dmsg = JSON.parse(msg);
-  console.log("got a message: " + dmsg.x + ", " + dmsg.y);
-  }
-```
-This will register a callback that is run whenever a message on that channel is received over the eventbus.
-
