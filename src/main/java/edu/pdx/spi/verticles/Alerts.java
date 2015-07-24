@@ -42,7 +42,7 @@ public class Alerts extends AbstractVerticle {
       // handle new registration tokens from android app
       eb.consumer("newGcmToken", message -> {
           String userRegToken = message.body().toString();
-          System.out.println("Received message: " + userRegToken);
+          System.out.println("Received New User Registration: " + userRegToken);
 
           // add new token to list
           userGcmRegistrationTokens.add(userRegToken);
@@ -50,14 +50,13 @@ public class Alerts extends AbstractVerticle {
 
       // Sends a new alert every 20 seconds
       vertx.setPeriodic(interval, id -> {
-          System.out.println("Sending GCM Messages to " + userGcmRegistrationTokens.size() + " current users");
-
-          // create message to send to watch user
 
           // send message to each registered user
           for (int i = 0; i < userGcmRegistrationTokens.size(); ++i) {
-              System.out.print("Sending to: " + userGcmRegistrationTokens.get(i));
+              // create message to send to watch user
               GcmContent content = createContent(userGcmRegistrationTokens.get(i));
+
+              // Send message to specified user
               sendMessage(content, API_KEY);
           }
 

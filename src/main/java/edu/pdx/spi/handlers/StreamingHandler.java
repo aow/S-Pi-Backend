@@ -1,5 +1,6 @@
 package edu.pdx.spi.handlers;
 
+import edu.pdx.spi.ValidWaveforms;
 import io.vertx.core.Handler;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.Json;
@@ -19,6 +20,11 @@ public class StreamingHandler implements Handler<RoutingContext> {
     // Get the requested parameters.
     String type = rc.request().getParam("type");
     String id = rc.request().getParam("id");
+
+    if (!ValidWaveforms.contains(type)) {
+      rc.response().end("Invalid waveform");
+      return;
+    }
 
     // Put them in the JSON object we'll be sending.
     js.put("type", type);

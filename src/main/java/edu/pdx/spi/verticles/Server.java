@@ -8,9 +8,10 @@ import io.vertx.core.http.HttpMethod;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
+import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.CookieHandler;
 import io.vertx.ext.web.handler.CorsHandler;
-
+import static edu.pdx.spi.ChannelNames.*;
 import edu.pdx.spi.handlers.PatientsHandler;
 import io.vertx.ext.web.handler.SessionHandler;
 import io.vertx.ext.web.handler.sockjs.BridgeOptions;
@@ -26,15 +27,13 @@ public class Server extends AbstractVerticle {
 
   @Override
   public void start() {
-    int port = this.config().getInteger("port");
-    String hostname = this.config().getString("hostname");
+    int port = this.config().getInteger("vertxPort");
+    String hostname = this.config().getString("vertxHost");
 
-    SessionStore sessStore = LocalSessionStore.create(vertx);
 
     Router router = Router.router(vertx);
     router.route().handler(CorsHandler.create("*").allowedMethod(HttpMethod.GET));
-    router.route().handler(CookieHandler.create());
-    router.route().handler(SessionHandler.create(sessStore).setNagHttps(false).setSessionCookieName("cook"));
+    router.route().handler(BodyHandler.create());
     eb = vertx.eventBus();
 
     // Patient data routes
@@ -43,7 +42,10 @@ public class Server extends AbstractVerticle {
     router.route("/patients").handler(ph);
 
     // Alerts
-    router.route("/alerts/:id").handler(new AlertMonitorHandler());
+    AlertMonitorHandler ah = new AlertMonitorHandler();
+    router.route("/alerts/:id").handler(ah);
+    // Route for handling BigDawg posted replies
+    router.post("/alerts/incoming").handler(ah);
 
     // Numerical stream endpoints
     StreamingHandler streamHandle = new StreamingHandler();
@@ -63,7 +65,8 @@ public class Server extends AbstractVerticle {
           break;
         case SOCKET_CLOSED:
           System.out.println("Socket closed.");
-          eb.send("ended", event.socket().headers().get("X-Real-IP"));
+          // Socket got closed, trigger the end event.
+          eb.send(STREAM_END, event.socket().headers().get("X-Real-IP"));
           break;
         case RECEIVE:
           break;

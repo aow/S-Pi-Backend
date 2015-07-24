@@ -1,5 +1,7 @@
 package edu.pdx.spi.verticles;
 
+import static edu.pdx.spi.ChannelNames.*;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.pdx.spi.fakedata.models.Patient;
 import io.vertx.core.AbstractVerticle;
@@ -13,10 +15,10 @@ final class Patients {
   Map<Integer, Patient> patients = new HashMap<>();
 
   public Patients() {
-    patients.put(1, new Patient(1, 100, "Jane", "Doe"));
-    patients.put(2, new Patient(2, 101, "John", "Doe"));
-    patients.put(3, new Patient(3, 102, "Lego", "Man"));
-    patients.put(4, new Patient(4, 103, "Suzy", "Doe"));
+    patients.put(1, new Patient(1));
+    patients.put(2, new Patient(2));
+    patients.put(3, new Patient(3));
+    patients.put(4, new Patient(4));
   }
 
   public Patient getPatient(int id) {
@@ -34,18 +36,16 @@ public final class DataSource extends AbstractVerticle {
   Random rn;
   EventBus eb;
   Map<String, Long> activeClientTimers;
-  Map<String, Integer> listenerCounts;
-  Map<String, List<String>> clientChannels;
   Map<String, List<String>> activeListeners;
-  boolean DEBUG;
+  boolean SSTORE;
+  boolean BD;
 
   public void start() {
-    DEBUG = this.config().getBoolean("debug");
+    SSTORE = this.config().getBoolean("sstore");
+    BD = this.config().getBoolean("bigDawg");
     rn = new Random();
     eb = vertx.eventBus();
     activeClientTimers = new HashMap<>();
-    listenerCounts = new HashMap<>();
-    clientChannels = new HashMap<>();
     activeListeners = new HashMap<>();
 
     eb.consumer("patients", m -> {
@@ -53,7 +53,7 @@ public final class DataSource extends AbstractVerticle {
         try {
           m.reply(om.writeValueAsString(patientData.getAllPatients()));
         } catch (Exception e) {
-          m.reply("error parsing patient data");
+          m.reply("error parsing patient data" + e.getMessage());
         }
       } else {
         Patient p = patientData.getPatient(Integer.parseInt((String) m.body()));
@@ -69,37 +69,60 @@ public final class DataSource extends AbstractVerticle {
       }
     });
 
-    eb.consumer("streamrequest", m -> {
+    registerStreamRequestEventBusHandler();
+    registerAlertsRequestEventBusHandler();
+    registerTerminateStreamSessionEventBusHandler();
+  }
+
+  /**
+   *  Listens for requests for streams and handles setting up the response channel
+   *  as well as starting the stream itself. Replies with the requested stream's outgoing
+   *  channel.
+   */
+  private void registerStreamRequestEventBusHandler() {
+    eb.consumer(WAVEFORM_REQ, m-> {
       JsonObject requestData = (JsonObject) m.body();
+      String type = requestData.getString("type");
+      String id = requestData.getString("id");
 
-      String responseChannel = requestData.getString("type") + "." + requestData.getString("id");
-
-      startStreamingQuery(responseChannel, requestData.getString("type"), requestData.getString("id"), requestData.getString("ip"));
-
+      String responseChannel = type + "." + id;
+      startStreamingQuery(responseChannel, type, id, requestData.getString("ip"));
       m.reply(responseChannel);
     });
+  }
 
-    eb.consumer("alertrequest", m -> {
+  private void registerAlertsRequestEventBusHandler() {
+    eb.consumer(ALERTS_REQ, m -> {
       JsonObject req = (JsonObject) m.body();
-      startAlerts("alerts", req.getString("id"), req.getString("ip"));
-      m.reply("alerts");
+      String responseChannel = "alerts" + "." + req.getString("id");
+      startAlerts(responseChannel, req.getString("id"), req.getString("ip"));
+      m.reply(responseChannel);
     });
+  }
 
-    eb.consumer("ended", m -> {
+  private void registerTerminateStreamSessionEventBusHandler() {
+    eb.consumer(STREAM_END, m -> {
+      // For every channel's listener list
       activeListeners.entrySet().forEach(e -> {
+        // Try and remove a single count for the IP that just disconnected
+        // Don't remove all instances, as the client can have multiple windows open
         e.getValue().remove(m.body());
+        // If the client list is empty, that means the channel is no longer needed
         if (e.getValue().isEmpty()) {
+          // So kill the timer
           killTimer(e.getKey());
         }
       });
+      // Then clear out the reference to it in the cache.
       activeListeners.entrySet().removeIf(e -> e.getValue().isEmpty());
     });
   }
 
   private void startAlerts(String responseChannel, String id, String ip) {
-    long timerId;
+    // Same deal as startStreamingQuery.
+    long timerId = 1L;
 
-    if (activeClientTimers.get(responseChannel) != null) {
+    if (Objects.nonNull(activeClientTimers.get(responseChannel))) {
       activeListeners.compute(responseChannel, (k,v) -> {
         v.add(ip);
         return v;
@@ -107,15 +130,21 @@ public final class DataSource extends AbstractVerticle {
       return;
     }
 
-    if (DEBUG) {
-      timerId = startFakeAlertTimer();
-    } else {
+    if (BD) {
+      //TODO: do something here for bigdawg alerts
+      // Our routes that BigDawg will post back to should be in the form /alerts/incoming/[patientid]
+      throw new RuntimeException("BigDawg is not implemented yet.");
+    } else if (SSTORE) {
+      //TODO: Don't think this needs to be here anymore, but good to implement in case of future need.
       timerId = startSstoreTimer(responseChannel, "alert", id);
+    } else {
+      // Local alerts
+      timerId = startFakeAlertTimer(responseChannel);
     }
 
     activeClientTimers.put(responseChannel, timerId);
     activeListeners.compute(responseChannel, (k,v) -> {
-      if (v == null) v = new ArrayList<>();
+      if (Objects.isNull(v)) v = new ArrayList<>();
       v.add(ip);
       return v;
     });
@@ -125,7 +154,7 @@ public final class DataSource extends AbstractVerticle {
     long timerId;
 
     // If an entry exists, there is a timer running already, so just add the ip for tracking
-    if (activeClientTimers.get(responseChannel) != null) {
+    if (Objects.nonNull(activeClientTimers.get(responseChannel))) {
       activeListeners.compute(responseChannel, (k,v) -> {
         v.add(ip);
         return v;
@@ -134,33 +163,34 @@ public final class DataSource extends AbstractVerticle {
     }
 
     // Otherwise, start the timer
-    if (DEBUG) {
-      timerId = startFakeTimer(responseChannel);
-    } else {
+    if (SSTORE) {
       timerId = startSstoreTimer(responseChannel, type, id);
+    } else {
+      timerId = startFakeTimer(responseChannel);
     }
 
+    // And store the reference to the timer for caching
     activeClientTimers.put(responseChannel, timerId);
 
-    // If the mapping doesn't exist, set it to one, otherwise increment the value.
+    // Then init the array and add the ip for tracking activity
     activeListeners.compute(responseChannel, (k,v) -> {
-      if (v == null) v = new ArrayList<>();
+      if (Objects.isNull(v)) v = new ArrayList<>();
       v.add(ip);
       return v;
     });
   }
 
-  private long startFakeAlertTimer() {
+  private long startFakeAlertTimer(String responseChannel) {
     long id = vertx.setPeriodic(10000, t -> {
       if (rn.nextBoolean()) {
         JsonObject js = new JsonObject();
-        js.put("patient_id", rn.nextInt(5));
+        js.put("patient_id", rn.nextInt(4));
         js.put("ts", System.currentTimeMillis());
         js.put("signame", "blue");
         js.put("interval", 2);
         js.put("alert_msg", "It is an alert!");
         js.put("action_msg", "Do something!");
-        eb.publish("alerts", js);
+        eb.publish(responseChannel, js);
       }
     });
 
@@ -186,7 +216,7 @@ public final class DataSource extends AbstractVerticle {
   private long startSstoreTimer(String responseChannel, String queryType, String patientId) {
     JsonObject outData = new JsonObject();
     outData.put("channel", responseChannel).put("query", queryType).put("id", patientId);
-    return vertx.setPeriodic(1000, t -> eb.send("sstore", outData));
+    return vertx.setPeriodic(1000, t -> eb.publish("sstore", outData));
   }
 
   private void killTimer(String name) {
