@@ -1,59 +1,86 @@
 package edu.pdx.spi.verticles;
 
-import edu.pdx.spi.handlers.UnsubHandler;
+import edu.pdx.spi.handlers.AlertMonitorHandler;
+import edu.pdx.spi.handlers.StreamingHandler;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.http.HttpMethod;
+import io.vertx.core.json.JsonArray;
+import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
+import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.ext.web.handler.CookieHandler;
 import io.vertx.ext.web.handler.CorsHandler;
-import io.vertx.ext.web.handler.sockjs.*;
-
+import static edu.pdx.spi.ChannelNames.*;
 import edu.pdx.spi.handlers.PatientsHandler;
-import edu.pdx.spi.handlers.StreamingNumericalHandler;
-import edu.pdx.spi.handlers.StreamingWaveformHandler;
+import io.vertx.ext.web.handler.SessionHandler;
+import io.vertx.ext.web.handler.sockjs.BridgeOptions;
+import io.vertx.ext.web.handler.sockjs.PermittedOptions;
+import io.vertx.ext.web.handler.sockjs.SockJSHandler;
+import io.vertx.ext.web.sstore.LocalSessionStore;
+import io.vertx.ext.web.sstore.SessionStore;
+
+import java.util.ArrayList;
 
 public class Server extends AbstractVerticle {
   EventBus eb;
 
   @Override
   public void start() {
+    int port = this.config().getInteger("vertxPort");
+    String hostname = this.config().getString("vertxHost");
+
+
     Router router = Router.router(vertx);
     router.route().handler(CorsHandler.create("*").allowedMethod(HttpMethod.GET));
+    router.route().handler(BodyHandler.create());
     eb = vertx.eventBus();
 
     // Patient data routes
     PatientsHandler ph = new PatientsHandler();
-    router.route("/api/patients/:id").handler(ph);
-    router.route("/api/patients").handler(ph);
+    router.route("/patients/:id").handler(ph);
+    router.route("/patients").handler(ph);
+
+    // Alerts
+    AlertMonitorHandler ah = new AlertMonitorHandler();
+    router.route("/alerts/:id").handler(ah);
+    // Route for handling BigDawg posted replies
+    router.post("/alerts/incoming").handler(ah);
 
     // Numerical stream endpoints
-    StreamingNumericalHandler sn = new StreamingNumericalHandler();
-    router.route("/api/stream/numerical/:type/:id").handler(sn);
-
+    StreamingHandler streamHandle = new StreamingHandler();
+    router.route("/stream/numerical/:type/:id").handler(streamHandle);
     // Waveform stream endpoints
-    StreamingWaveformHandler sw = new StreamingWaveformHandler();
-    router.route("/api/stream/waveform/:type/:id").handler(sw);
-
-    router.route("/api/unsub/:name").handler(new UnsubHandler());
+    router.route("/stream/waveform/:type/:id").handler(streamHandle);
 
     // Bridged eventbus permissions
     BridgeOptions options = new BridgeOptions();
     options.addOutboundPermitted(new PermittedOptions().setAddressRegex(".+\\..+"));
+    options.addOutboundPermitted(new PermittedOptions().setAddress("alerts"));
 
-    router.route("/api/streambus/*").handler(SockJSHandler.create(vertx).bridge(options, event -> {
-      if (event.type() == BridgeEvent.Type.SOCKET_CREATED) {
-        System.out.println("Socket created");
-        System.out.println(event.socket().remoteAddress().host());
-      }
-      else if (event.type() == BridgeEvent.Type.SOCKET_CLOSED) {
-        System.out.println("Socket closed ");
-        eb.send("unsub", event.socket().remoteAddress().host());
+    router.route("/streambus/*").handler(SockJSHandler.create(vertx).bridge(options, event -> {
+      switch (event.type()) {
+        case SOCKET_CREATED:
+          System.out.println("Socket created.");
+          break;
+        case SOCKET_CLOSED:
+          System.out.println("Socket closed.");
+          // Socket got closed, trigger the end event.
+          eb.send(STREAM_END, event.socket().headers().get("X-Real-IP"));
+          break;
+        case RECEIVE:
+          break;
+        case SEND:
+          break;
       }
 
       event.complete(true);
     }));
 
-    vertx.createHttpServer().requestHandler(router::accept).listen(9999);
-    System.out.println("Server listening on port 9999.");
+    vertx.createHttpServer()
+        .requestHandler(router::accept)
+        .listen(port, hostname);
+
+    System.out.println("Server started on " + hostname + ":" + port);
   }
 }
