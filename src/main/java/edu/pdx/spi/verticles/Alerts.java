@@ -4,46 +4,63 @@ package edu.pdx.spi.verticles;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.pdx.spi.GcmContent;
 import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Handler;
 import io.vertx.core.eventbus.EventBus;
+import io.vertx.core.eventbus.Message;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.CorsHandler;
 
-import org.apache.commons.io.IOUtils;
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import java.io.*;
 import java.net.*;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 
 
 public class Alerts extends AbstractVerticle {
-  public static final String API_KEY = "AIzaSyBe-3d2hooDYXHHQt5Rb8Qo4wn0vRVRMNE";
+    EventBus eb;
+    int port = 9994;
+    public static final String API_KEY = "AIzaSyBe-3d2hooDYXHHQt5Rb8Qo4wn0vRVRMNE";
     String UserKey;
-  int port = 9996;
-  EventBus eb;
+
+    // alert sending interval
+    int interval = 20000;
+
 
   @Override
   public void start() {
-    Router router = Router.router(vertx);
-    router.route().handler(CorsHandler.create("*").allowedMethod(HttpMethod.GET));
-    eb = vertx.eventBus();
+      // TODO: delete inactive registration numbers? (maintain mapping of active users...)
+      // GCM registration numbers
+      List<String> userGcmRegistrationTokens = new LinkedList<String>();
 
-    System.out.println("running alerts simulation");
+      eb = vertx.eventBus();
 
-    // get registration code from app
-    getRegistrationCode();
+      System.out.println("running alerts simulation, sending every " + interval + " milliseconds");
 
-    // Sends a new alert every 20 seconds
-    vertx.setPeriodic(20000, id -> {
-      // send message to client at specified token
-      System.out.println("Sending GCM Message");
+      // handle new registration tokens from android app
+      eb.consumer("newGcmToken", message -> {
+          String userRegToken = message.body().toString();
+          System.out.println("Received message: " + userRegToken);
 
-        // create message to send to watch user
-        GcmContent content = createContent();
+          // add new token to list
+          userGcmRegistrationTokens.add(userRegToken);
+      });
 
-        // send message to user
-        sendMessage(content, API_KEY);
+      // Sends a new alert every 20 seconds
+      vertx.setPeriodic(interval, id -> {
+          System.out.println("Sending GCM Messages to " + userGcmRegistrationTokens.size() + " current users");
+
+          // create message to send to watch user
+
+          // send message to each registered user
+          for (int i = 0; i < userGcmRegistrationTokens.size(); ++i) {
+              System.out.print("Sending to: " + userGcmRegistrationTokens.get(i));
+              GcmContent content = createContent(userGcmRegistrationTokens.get(i));
+              sendMessage(content, API_KEY);
+          }
+
     });
   }
   private void getRegistrationCode() {
@@ -73,12 +90,13 @@ public class Alerts extends AbstractVerticle {
   }
 
     // creates message content to be sent to watch
-    public GcmContent createContent(){
+    public GcmContent createContent(String userToken){
 
         GcmContent c = new GcmContent();
 
-        c.addRegId(UserKey);
+        c.addRegId(userToken);
         c.createData("SPI ALERT!", "***WATCH DEMO:This is the message section of the GCM message***");
+
 
         return c;
     }
@@ -102,7 +120,7 @@ public class Alerts extends AbstractVerticle {
 
             // 5. Add JSON data into POST request body
 
-            // 5.1 Use Jackson object mapper to convert Contnet object into JSON
+            // 5.1 Use Jackson object mapper to convert Content object into JSON
             ObjectMapper mapper = new ObjectMapper();
 
             // 5.2 Get connection output stream
