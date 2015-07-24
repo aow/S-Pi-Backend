@@ -31,7 +31,9 @@ public class Alerts extends AbstractVerticle {
 
   @Override
   public void start() {
-      // TODO: delete inactive registration numbers? (maintain mapping of active users...)
+      // TODO: delete inactive registration numbers?
+      // (maintain mapping of active users instead of just ones who've registered...)
+      
       // GCM registration numbers
       List<String> userGcmRegistrationTokens = new LinkedList<String>();
 
@@ -61,31 +63,6 @@ public class Alerts extends AbstractVerticle {
           }
 
     });
-  }
-  private void getRegistrationCode() {
-      String msg;
-      try {
-          ServerSocket client = new ServerSocket(port);
-          // TODO: implement this as a while loop or some construct to constantly listen for new users
-          if(true)   {
-              Socket connectionSocket = client.accept();
-              BufferedReader inFromClient = new BufferedReader(new InputStreamReader(connectionSocket.getInputStream()));
-              DataOutputStream outToClient = new DataOutputStream(connectionSocket.getOutputStream());
-              msg = inFromClient.readLine();
-              System.out.println("Received: " + msg);
-              String resp = msg.toUpperCase() + '\n';
-              outToClient.writeBytes("thanks for the registration token!");
-
-              // TODO: reimplement this as a mapping for multiple users
-              // save registration token to global var for future use
-              UserKey = msg;
-          }
-
-      } catch (Exception e) {
-          System.out.print("getRegistrationCode ERROR:" + e);
-          System.exit(1);
-      }
-
   }
 
     // creates message content to be sent to watch
