@@ -33,7 +33,7 @@ public class Alerts extends AbstractVerticle {
   public void start() {
       // TODO: delete inactive registration numbers?
       // (maintain mapping of active users instead of just ones who've registered...)
-
+      
       // GCM registration numbers
       List<String> userGcmRegistrationTokens = new LinkedList<String>();
 
@@ -113,8 +113,8 @@ public class Alerts extends AbstractVerticle {
 
             // 6. Get the response
             int responseCode = conn.getResponseCode();
-            // System.out.println("\nSending 'POST' request to URL : " + url);
-            // System.out.println("Response Code : " + responseCode);
+            System.out.println("\nSending 'POST' request to URL : " + url);
+            System.out.println("Response Code : " + responseCode);
 
             BufferedReader in = new BufferedReader(
                     new InputStreamReader(conn.getInputStream()));
@@ -127,7 +127,7 @@ public class Alerts extends AbstractVerticle {
             in.close();
 
             // 7. Print result
-            // System.out.println(response.toString());
+            System.out.println(response.toString());
 
         } catch (MalformedURLException e) {
             e.printStackTrace();
