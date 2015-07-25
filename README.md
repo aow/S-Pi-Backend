@@ -73,7 +73,8 @@ server {
                 proxy_set_header Connection "upgrade";
                 proxy_set_header Host $host;
                 # Change this if you run vertx on a different port/host.
-                proxy_pass http://localhost:9999/;
+                # Make sure to use 127.0.0.1, as nginx will try to use ipv6 loopback otherwise
+                proxy_pass http://127.0.0.1:9999/;
         }
 }
 
