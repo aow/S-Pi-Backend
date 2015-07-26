@@ -8,6 +8,7 @@ import io.vertx.core.json.JsonObject;
 import java.io.*;
 import java.net.ConnectException;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.*;
 
@@ -20,50 +21,38 @@ public class SstoreConnector extends AbstractVerticle {
   EventBus eb;
   String host;
   int port;
+  boolean reconnecting;
 
   @Override
   public void start() {
     host = this.config().getString("sstoreClientHost");
     port = this.config().getInteger("sstoreClientPort");
+    reconnecting = false;
     openSocket(host, port);
-    if (!socket.isConnected()) {
-      vertx.setPeriodic(1000, h -> {
-        openSocket(host, port);
-        if (socket.isConnected()) {
-          vertx.cancelTimer(h);
-        }
-      });
-    }
-
     eb = vertx.eventBus();
 
     eb.consumer("sstore", msg -> {
       JsonObject jmsg = (JsonObject)msg.body();
-      JsonObject outMsg;
+      Optional<JsonObject> outMsg;
       long startTime = System.nanoTime();
-      if (socket.isConnected()) {
-        outMsg = query(jmsg.getString("query"), jmsg.getString("id"));
-      } else {
-        outMsg = null;
-        vertx.setPeriodic(1000, h -> {
-          openSocket(host, port);
-          if (socket.isConnected()) {
-            vertx.cancelTimer(h);
-          }
-        });
-      }
+      outMsg = query(jmsg.getString("query"), jmsg.getString("id"));
       long endTime = System.nanoTime();
-      System.out.println("Query took " + (endTime-startTime) + "seconds.");
-      if (Objects.nonNull(outMsg)) {
-        eb.publish(jmsg.getString("channel"), outMsg);
+      System.out.println("Query took " + (endTime-startTime)/1000000 + " ms.");
+      if (outMsg.isPresent()) {
+        eb.publish(jmsg.getString("channel"), outMsg.get());
       }
     });
   }
 
   private void openSocket(String hostname, int port) {
     try {
+      if (Objects.nonNull(socket)) {
+        socket.close();
+      }
       socket = new Socket(hostname, port);
+      socket.setSoTimeout(5000);
       System.out.println("Connected to S-Store client.");
+      reconnecting = false;
     } catch (UnknownHostException e) {
       throw new RuntimeException("Error resolving S-Store client hostname: " + e.getMessage());
     } catch (IOException e) {
@@ -81,9 +70,20 @@ public class SstoreConnector extends AbstractVerticle {
     socketReader = new BufferedReader(new InputStreamReader(inputStream));
   }
 
+  private void retryOpen() {
+    if (!socket.isConnected() && !reconnecting) {
+      reconnecting = true;
+      vertx.setPeriodic(1000, h -> {
+        openSocket(host, port);
+        if (socket.isConnected()) {
+          vertx.cancelTimer(h);
+        }
+      });
+    }
+  }
 
-  private JsonObject query(String type, String userId) {
-    JsonObject resp = new JsonObject();
+  private Optional<JsonObject> query(String type, String userId) {
+    JsonObject resp;
     String queryText;
     // Figure out which query to run.
     //TODO: Fix this for more query types once they are added.
@@ -99,23 +99,29 @@ public class SstoreConnector extends AbstractVerticle {
       queryText = new JsonObject().put("proc", "GetRecentAlerts").put("args", args).encode();
     }
     socketWriter.println(queryText);
+
     System.out.println("Sent s-store query.");
 
     try {
-      String response = socketReader.readLine();
+      JsonObject response = new JsonObject(socketReader.readLine());
       if (!type.equals("alert")) {
-        JsonArray unsorted = new JsonObject(response).getJsonArray("data");
         // Sort the timestamps. Temp solution until s-store returns the data presorted.
-        Collections.sort(unsorted.getList(), comp);
-        resp = new JsonObject(response).put("data", unsorted);
+        Collections.sort(response.getJsonArray("data").getList(), comp);
+        resp = response;
       } else {
-        resp = new JsonObject(response);
+        resp = response.getJsonArray("data").getList().isEmpty() ? null : response;
       }
     } catch (IOException e) {
+      reconnecting = true;
+      openSocket(host, port);
+      retryOpen();
       System.out.println("Error reading from socket: " + e.getMessage());
+      resp = null;
+    } catch (Exception e) {
+      resp = null;
     }
 
-    return resp;
+    return Optional.ofNullable(resp);
   }
   Comparator<LinkedHashMap<String, Object>> comp = (o1, o2) -> Integer.compare((Integer)o1.get("TS"), (Integer)o2.get("TS"));
 }
