@@ -1,6 +1,7 @@
 package edu.pdx.spi.verticles;
 
 import edu.pdx.spi.handlers.AlertMonitorHandler;
+import edu.pdx.spi.handlers.AlertPostBackHandler;
 import edu.pdx.spi.handlers.StreamingHandler;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.eventbus.EventBus;
@@ -42,10 +43,9 @@ public class Server extends AbstractVerticle {
     router.route("/patients").handler(ph);
 
     // Alerts
-    AlertMonitorHandler ah = new AlertMonitorHandler();
-    router.route("/alerts/:id").handler(ah);
+    router.route("/alerts/:id").handler(new AlertMonitorHandler());
     // Route for handling BigDawg posted replies
-    router.post("/alerts/incoming").handler(ah);
+    router.post("/incoming/:alertName").handler(new AlertPostBackHandler());
 
     // Numerical stream endpoints
     StreamingHandler streamHandle = new StreamingHandler();
