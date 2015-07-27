@@ -15,6 +15,8 @@ public class Deploy extends AbstractVerticle {
     }
 
     vertx.deployVerticle("edu.pdx.spi.verticles.DataSource", normalOptions);
+    vertx.deployVerticle("edu.pdx.spi.verticles.Alerts", workerOptions);
+    vertx.deployVerticle("edu.pdx.spi.verticles.GcmRegistrationServer", workerOptions);
     vertx.deployVerticle("edu.pdx.spi.verticles.Server", normalOptions);
   }
 }
