@@ -160,7 +160,10 @@ public final class DataSource extends AbstractVerticle {
       vertx.setPeriodic(1000, t -> {
         HttpClientRequest request = requestClient.post("/bigdawg/registeralert", handler -> {
           System.out.println(handler.statusMessage());
-          handler.bodyHandler(System.out::println);
+          handler.bodyHandler(resp -> {
+            eb.publish(responseChannel, new JsonObject(resp.toString()));
+            System.out.println(resp.toString());
+          });
         });
         System.out.println("Sending BD post");
         request.headers().set(HttpHeaders.CONTENT_TYPE, "application/json");
