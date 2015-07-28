@@ -17,7 +17,9 @@ public class AlertPostBackHandler implements Handler<RoutingContext> {
       // We provide the alertId param to BigDawg, so we can just retrieve it
       // and push the data out over the eventbus. Assume we are getting JSON.
       //TODO: Fix this if we don't get JSON from BigDawg.
-      eb.publish(rc.request().getParam("alertId"), rc.getBodyAsJson());
+
+      eb.publish(rc.request().getParam("alertName"), rc.getBodyAsJson());
+      System.out.println("Got alert postback");
       rc.response().end();
     }
   }

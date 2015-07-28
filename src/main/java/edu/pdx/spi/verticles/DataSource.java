@@ -9,6 +9,7 @@ import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpClientOptions;
 import io.vertx.core.http.HttpClientRequest;
+import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 
@@ -57,7 +58,7 @@ public final class DataSource extends AbstractVerticle {
     if (BD) {
       clientOptions = new HttpClientOptions()
           .setDefaultHost(this.config().getString("bigDawgUrl"))
-          .setDefaultPort(80);
+          .setDefaultPort(8080);
       requestClient = vertx.createHttpClient(clientOptions);
       // Change this if you need to test locally. Make sure it points to the vertx url
       // not the main site url.
@@ -150,19 +151,22 @@ public final class DataSource extends AbstractVerticle {
     if (BD) {
       JsonObject query = new JsonObject();
       //TODO: Figure out what proc to call.
-      query.put("Query", "{proc: \"\", args:[]}");
-      query.put("NotifyURL", baseBigDogUrl + responseChannel);
-      query.put("Authorization", "{}");
-      query.put("OneTime", false);
+      query.put("query", "checkHeartRate");
+      query.put("notifyURL", baseBigDogUrl + responseChannel);
+      query.put("authorization", new JsonObject());
+      query.put("pushNotify", true);
+      query.put("oneTime", false);
       //TODO: do something here for bigdawg alerts
       // Our routes that BigDawg will post back to should be in the form /incoming/[alertId]
-      HttpClientRequest request = requestClient.post("some/rest/path/", handler -> {
-        // Check the response to see if everything worked.
+      HttpClientRequest request = requestClient.post("/bigdawg/registeralert", handler -> {
+        System.out.println(handler.statusMessage());
+        handler.bodyHandler(System.out::println);
+
       });
-
+      System.out.println("Sending BD post");
+      request.headers().set(HttpHeaders.CONTENT_TYPE, "application/json");
       request.end(query.encode());
-
-      throw new RuntimeException("BigDawg is not implemented yet.");
+      System.out.println("Sent BD post");
     } else if (SSTORE) {
       //TODO: Don't think this needs to be here anymore, but good to implement in case of future need.
       timerId = startSstoreTimer(responseChannel, "alert", id);
