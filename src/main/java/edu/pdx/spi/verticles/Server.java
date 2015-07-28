@@ -56,7 +56,8 @@ public class Server extends AbstractVerticle {
     // Bridged eventbus permissions
     BridgeOptions options = new BridgeOptions();
     options.addOutboundPermitted(new PermittedOptions().setAddressRegex(".+\\..+"));
-    options.addOutboundPermitted(new PermittedOptions().setAddress("alerts"));
+    options.addOutboundPermitted(new PermittedOptions().setAddress(ALL_ALERTS));
+    options.addOutboundPermitted(new PermittedOptions().setAddress(STREAM_RESTART));
 
     router.route("/streambus/*").handler(SockJSHandler.create(vertx).bridge(options, event -> {
       switch (event.type()) {

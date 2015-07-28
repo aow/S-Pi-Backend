@@ -150,23 +150,23 @@ public final class DataSource extends AbstractVerticle {
 
     if (BD) {
       JsonObject query = new JsonObject();
-      //TODO: Figure out what proc to call.
       query.put("query", "checkHeartRate");
       query.put("notifyURL", baseBigDogUrl + responseChannel);
       query.put("authorization", new JsonObject());
-      query.put("pushNotify", true);
+      query.put("pushNotify", false);
       query.put("oneTime", false);
       //TODO: do something here for bigdawg alerts
       // Our routes that BigDawg will post back to should be in the form /incoming/[alertId]
-      HttpClientRequest request = requestClient.post("/bigdawg/registeralert", handler -> {
-        System.out.println(handler.statusMessage());
-        handler.bodyHandler(System.out::println);
-
+      vertx.setPeriodic(1000, t -> {
+        HttpClientRequest request = requestClient.post("/bigdawg/registeralert", handler -> {
+          System.out.println(handler.statusMessage());
+          handler.bodyHandler(System.out::println);
+        });
+        System.out.println("Sending BD post");
+        request.headers().set(HttpHeaders.CONTENT_TYPE, "application/json");
+        request.end(query.encode());
+        System.out.println("Sent BD post");
       });
-      System.out.println("Sending BD post");
-      request.headers().set(HttpHeaders.CONTENT_TYPE, "application/json");
-      request.end(query.encode());
-      System.out.println("Sent BD post");
     } else if (SSTORE) {
       //TODO: Don't think this needs to be here anymore, but good to implement in case of future need.
       timerId = startSstoreTimer(responseChannel, "alert", id);
@@ -181,6 +181,27 @@ public final class DataSource extends AbstractVerticle {
       v.add(ip);
       return v;
     });
+  }
+
+  private void registerBigDawgPushAlerts(String responseChannel) {
+    JsonObject query = new JsonObject();
+    //TODO: Figure out what proc to call.
+    query.put("query", "checkHeartRate");
+    query.put("notifyURL", baseBigDogUrl + responseChannel);
+    query.put("authorization", new JsonObject());
+    query.put("pushNotify", true);
+    query.put("oneTime", false);
+    //TODO: do something here for bigdawg alerts
+    // Our routes that BigDawg will post back to should be in the form /incoming/[alertId]
+    HttpClientRequest request = requestClient.post("/bigdawg/registeralert", handler -> {
+      System.out.println(handler.statusMessage());
+      handler.bodyHandler(System.out::println);
+
+    });
+    System.out.println("Sending BD post");
+    request.headers().set(HttpHeaders.CONTENT_TYPE, "application/json");
+    request.end(query.encode());
+    System.out.println("Sent BD post");
   }
 
   private void startStreamingQuery(String responseChannel, String type, String id, String ip) {
