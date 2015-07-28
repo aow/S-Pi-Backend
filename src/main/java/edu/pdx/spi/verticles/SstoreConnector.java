@@ -36,7 +36,7 @@ public class SstoreConnector extends AbstractVerticle {
       JsonObject jmsg = (JsonObject)msg.body();
       Optional<JsonObject> outMsg;
       long startTime = System.nanoTime();
-      outMsg = query(jmsg.getString("query"), jmsg.getString("id"));
+      outMsg = !reconnecting ? query(jmsg.getString("query"), jmsg.getString("id")) : Optional.empty();
       long endTime = System.nanoTime();
       System.out.println("Query took " + (endTime-startTime)/1000000 + " ms.");
       if (outMsg.isPresent()) {
@@ -123,7 +123,14 @@ public class SstoreConnector extends AbstractVerticle {
       retryOpen();
       System.out.println("Error reading from socket: " + e.getMessage());
       resp = null;
-    } catch (Exception e) {
+    } catch (ClassCastException e) {
+      resp = null;
+    }
+    catch (Exception e) {
+      reconnecting = true;
+      openSocket(host, port);
+      retryOpen();
+      System.out.println("Some error: " + e);
       resp = null;
     }
 
