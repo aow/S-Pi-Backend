@@ -4,7 +4,7 @@ import io.vertx.core.AbstractVerticle;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
-
+import static edu.pdx.spi.ChannelNames.*;
 import java.io.*;
 import java.net.ConnectException;
 import java.net.Socket;
@@ -39,7 +39,10 @@ public class SstoreConnector extends AbstractVerticle {
       long endTime = System.nanoTime();
       System.out.println("Query took " + (endTime-startTime)/1000000 + " ms.");
       if (outMsg.isPresent()) {
+        // Send to specific channels for web.
         eb.publish(jmsg.getString("channel"), outMsg.get());
+        // Send to allAlerts channel for phone/watch.
+        eb.publish(ALL_ALERTS, outMsg.get());
       }
     });
   }
