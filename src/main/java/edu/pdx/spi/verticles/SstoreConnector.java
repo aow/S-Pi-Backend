@@ -25,12 +25,12 @@ public class SstoreConnector extends AbstractVerticle {
 
   @Override
   public void start() {
+    eb = vertx.eventBus();
     host = this.config().getString("sstoreClientHost");
     port = this.config().getInteger("sstoreClientPort");
     reconnecting = true;
     openSocket(host, port);
     retryOpen();
-    eb = vertx.eventBus();
 
     eb.consumer("sstore", msg -> {
       JsonObject jmsg = (JsonObject)msg.body();
@@ -57,7 +57,7 @@ public class SstoreConnector extends AbstractVerticle {
       socket.setSoTimeout(5000);
       System.out.println("Connected to S-Store client.");
       reconnecting = false;
-      eb.send(STREAM_RESTART, System.currentTimeMillis());
+      eb.publish(STREAM_RESTART, System.currentTimeMillis());
     } catch (UnknownHostException e) {
       throw new RuntimeException("Error resolving S-Store client hostname: " + e.getMessage());
     } catch (IOException e) {
