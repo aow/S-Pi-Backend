@@ -9,7 +9,6 @@ import static edu.pdx.spi.ChannelNames.*;
 
 public class AlertPostBackHandler implements Handler<RoutingContext> {
   EventBus eb;
-  JsonObject js;
 
   public void handle(RoutingContext rc) {
     eb = rc.vertx().eventBus();

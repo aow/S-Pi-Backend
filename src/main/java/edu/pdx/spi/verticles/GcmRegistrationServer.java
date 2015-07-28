@@ -22,23 +22,15 @@ public class GcmRegistrationServer extends AbstractVerticle {
         NetServer gcmServer = vertx.createNetServer();
 
         // handle incoming GCM Registration tokens from clients
-        gcmServer.connectHandler(new Handler<NetSocket>() {
-            @Override
-            public void handle(NetSocket sock) {
-                sock.handler(new Handler<Buffer>(){
-                    @Override
-                    public void handle(Buffer buffer) {
-                        // save as string and close socket
-                        String regToken = buffer.getString(0, buffer.length());
-                        sock.close();
+        gcmServer.connectHandler(sock -> sock.handler(buffer -> {
+            // save as string and close socket
+            String regToken = buffer.getString(0, buffer.length());
+            sock.close();
 
-                        // send registration token to alerts verticle
-                        eb.send("newGcmToken", regToken);
+            // send registration token to alerts verticle
+            eb.send("newGcmToken", regToken);
 
-                    }
-                });
-            }
-        }).listen(port, "0.0.0.0");
+        })).listen(port, "0.0.0.0");
 
 
     }
