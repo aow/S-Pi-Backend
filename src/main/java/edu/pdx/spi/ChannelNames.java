@@ -5,4 +5,5 @@ public final class ChannelNames {
   public static final String ALERTS_REQ = "alertrequest";
   public static final String STREAM_END = "ended";
   public static final String ALL_ALERTS = "allAlerts";
+  public static final String STREAM_RESTART = "restart";
 }
