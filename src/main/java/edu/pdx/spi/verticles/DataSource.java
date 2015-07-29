@@ -5,11 +5,10 @@ import static edu.pdx.spi.ChannelNames.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.pdx.spi.fakedata.models.Patient;
 import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Handler;
+import io.vertx.core.buffer.Buffer;
 import io.vertx.core.eventbus.EventBus;
-import io.vertx.core.http.HttpClient;
-import io.vertx.core.http.HttpClientOptions;
-import io.vertx.core.http.HttpClientRequest;
-import io.vertx.core.http.HttpHeaders;
+import io.vertx.core.http.*;
 import io.vertx.core.json.DecodeException;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
@@ -98,7 +97,7 @@ public final class DataSource extends AbstractVerticle {
    *  channel.
    */
   private void registerStreamRequestEventBusHandler() {
-    eb.consumer(WAVEFORM_REQ, m-> {
+    eb.consumer(WAVEFORM_REQ, m -> {
       JsonObject requestData = (JsonObject) m.body();
       String type = requestData.getString("type");
       String id = requestData.getString("id");
@@ -191,7 +190,7 @@ public final class DataSource extends AbstractVerticle {
     }
 
     activeClientTimers.put(responseChannel, timerId);
-    activeListeners.compute(responseChannel, (k,v) -> {
+    activeListeners.compute(responseChannel, (k, v) -> {
       if (Objects.isNull(v)) v = new ArrayList<>();
       v.add(ip);
       return v;
@@ -217,6 +216,42 @@ public final class DataSource extends AbstractVerticle {
     request.headers().set(HttpHeaders.CONTENT_TYPE, "application/json");
     request.end(query.encode());
     System.out.println("Sent BD post");
+  }
+
+  private void requestBigDawgAlert(String responseChannel) {
+    JsonObject query = new JsonObject();
+    query.put("query", "checkHeartRate");
+    query.put("notifyURL", baseBigDogUrl + responseChannel);
+    query.put("authorization", new JsonObject());
+    query.put("pushNotify", false);
+    query.put("oneTime", false);
+
+    HttpClientRequest request = requestClient.post("/bigdawg/registeralert", handler -> {
+      handler.bodyHandler(resp -> {
+        String statusUrl;
+        try {
+          statusUrl = new JsonObject(resp.toString()).getString("statusURL");
+        } catch (DecodeException e) {
+          System.out.println(resp.toString());
+          return;
+        }
+        startBigDawgTimer(responseChannel, statusUrl);
+      });
+    });
+    request.headers().set(HttpHeaders.CONTENT_TYPE, "application/json");
+    request.end(query.encode());
+  }
+
+  private void startBigDawgTimer(String responseChannel, String statusUrl) {
+    HttpClientRequest getData = requestClient.getAbs(statusUrl, dataResp -> {
+      dataResp.bodyHandler(d -> {
+        if (!d.toString().equals("None")) {
+          eb.publish(responseChannel, new JsonObject(d.toString()));
+          System.out.println(d.toString());
+        }
+      });
+    });
+    getData.end();
   }
 
   private void startStreamingQuery(String responseChannel, String type, String id, String ip) {
