@@ -10,6 +10,7 @@ import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpClientOptions;
 import io.vertx.core.http.HttpClientRequest;
 import io.vertx.core.http.HttpHeaders;
+import io.vertx.core.json.DecodeException;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 
@@ -138,7 +139,7 @@ public final class DataSource extends AbstractVerticle {
 
   private void startAlerts(String responseChannel, String id, String ip) {
     // Same deal as startStreamingQuery.
-    long timerId = 1L;
+    long timerId;
 
     if (Objects.nonNull(activeClientTimers.get(responseChannel))) {
       activeListeners.compute(responseChannel, (k,v) -> {
@@ -157,18 +158,29 @@ public final class DataSource extends AbstractVerticle {
       query.put("oneTime", false);
       //TODO: do something here for bigdawg alerts
       // Our routes that BigDawg will post back to should be in the form /incoming/[alertId]
-      vertx.setPeriodic(1000, t -> {
+      timerId = vertx.setPeriodic(1000, t -> {
         HttpClientRequest request = requestClient.post("/bigdawg/registeralert", handler -> {
-          System.out.println(handler.statusMessage());
           handler.bodyHandler(resp -> {
-            eb.publish(responseChannel, new JsonObject(resp.toString()));
-            System.out.println(resp.toString());
+            String respUrl;
+            try {
+              respUrl = new JsonObject(resp.toString()).getString("statusURL");
+            } catch (DecodeException e) {
+              System.out.println(resp.toString());
+              return;
+            }
+            HttpClientRequest getData = requestClient.getAbs(respUrl, dataResp -> {
+              dataResp.bodyHandler(d -> {
+                if (!d.toString().equals("None")) {
+                  eb.publish(responseChannel, new JsonObject(d.toString()));
+                  System.out.println(d.toString());
+                }
+              });
+            });
+            getData.end();
           });
         });
-        System.out.println("Sending BD post");
         request.headers().set(HttpHeaders.CONTENT_TYPE, "application/json");
         request.end(query.encode());
-        System.out.println("Sent BD post");
       });
     } else if (SSTORE) {
       //TODO: Don't think this needs to be here anymore, but good to implement in case of future need.
