@@ -27,7 +27,13 @@ final class Options {
   @JsonProperty
   Boolean bigDawg;
   @JsonProperty
-  String bigDawgUrl;
+  String bigDawgRequestUrl;
+  @JsonProperty
+  int bigDawgRequestPort;
+  @JsonProperty
+  String bigDawgPollUrl;
+  @JsonProperty
+  int bigDawgPollPort;
 
   public Options() {
     this.vertxHost = "localhost";
@@ -36,7 +42,10 @@ final class Options {
     this.sstoreClientHost = "localhost";
     this.sstoreClientPort = 6000;
     this.bigDawg = false;
-    this.bigDawgUrl = "";
+    this.bigDawgRequestUrl = "";
+    this.bigDawgRequestPort = 8080;
+    this.bigDawgPollUrl = "";
+    this.bigDawgPollPort = 8080;
   }
 
   @Override
