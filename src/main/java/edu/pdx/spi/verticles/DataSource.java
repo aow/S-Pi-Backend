@@ -286,6 +286,24 @@ public final class DataSource extends AbstractVerticle {
     });
   }
 
+  private boolean isCached(String responseChannel) {
+    return Objects.nonNull(activeClientTimers.get(responseChannel));
+  }
+
+  private void cacheIp(String responseChannel, String ip) {
+    activeListeners.compute(responseChannel, (channel, ips) -> {
+      if (Objects.isNull(ips)) ips = new ArrayList<>();
+      ips.add(ip);
+      return ips;
+    });
+  }
+
+  private void cacheTimer(String responseChannel, long timerId) {
+    if (Objects.nonNull(activeClientTimers.get(responseChannel))) {
+      activeClientTimers.put(responseChannel, timerId);
+    }
+  }
+
   private long startFakeAlertTimer(String responseChannel) {
     long id = vertx.setPeriodic(10000, t -> {
       if (rn.nextBoolean()) {
