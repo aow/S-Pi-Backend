@@ -13,6 +13,8 @@ import io.vertx.core.json.DecodeException;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.*;
 
 final class Patients {
@@ -46,6 +48,10 @@ public final class DataSource extends AbstractVerticle {
   HttpClient requestClient;
   HttpClientOptions clientOptions;
   String baseBigDogUrl;
+  Map<String, String> statusUrls;
+  String bigDawgPollUrl;
+  int bigDawgPollPort;
+
 
   public void start() {
     SSTORE = this.config().getBoolean("sstore");
@@ -56,10 +62,13 @@ public final class DataSource extends AbstractVerticle {
     activeListeners = new HashMap<>();
 
     if (BD) {
+      statusUrls = new HashMap<>();
       clientOptions = new HttpClientOptions()
-          .setDefaultHost(this.config().getString("bigDawgUrl"))
-          .setDefaultPort(8080);
+          .setDefaultHost(this.config().getString("bigDawgRequestUrl"))
+          .setDefaultPort(this.config().getInteger("bigDawgRequestPort"));
       requestClient = vertx.createHttpClient(clientOptions);
+      bigDawgPollUrl = this.config().getString("bigDawgPollUrl");
+      bigDawgPollPort = this.config().getInteger("bigDawgPollPort");
       // Change this if you need to test locally. Make sure it points to the vertx url
       // not the main site url.
       baseBigDogUrl = "http://api.s-pi-demo.com/incoming/";
@@ -140,11 +149,8 @@ public final class DataSource extends AbstractVerticle {
     // Same deal as startStreamingQuery.
     long timerId;
 
-    if (Objects.nonNull(activeClientTimers.get(responseChannel))) {
-      activeListeners.compute(responseChannel, (k,v) -> {
-        v.add(ip);
-        return v;
-      });
+    if (isCached(responseChannel)) {
+      cacheIp(responseChannel, ip);
       return;
     }
 
@@ -189,12 +195,8 @@ public final class DataSource extends AbstractVerticle {
       timerId = startFakeAlertTimer(responseChannel);
     }
 
-    activeClientTimers.put(responseChannel, timerId);
-    activeListeners.compute(responseChannel, (k, v) -> {
-      if (Objects.isNull(v)) v = new ArrayList<>();
-      v.add(ip);
-      return v;
-    });
+    cacheTimer(responseChannel, timerId);
+    cacheIp(responseChannel, ip);
   }
 
   private void registerBigDawgPushAlerts(String responseChannel) {
@@ -210,7 +212,6 @@ public final class DataSource extends AbstractVerticle {
     HttpClientRequest request = requestClient.post("/bigdawg/registeralert", handler -> {
       System.out.println(handler.statusMessage());
       handler.bodyHandler(System.out::println);
-
     });
     System.out.println("Sending BD post");
     request.headers().set(HttpHeaders.CONTENT_TYPE, "application/json");
@@ -219,6 +220,8 @@ public final class DataSource extends AbstractVerticle {
   }
 
   private void requestBigDawgAlert(String responseChannel) {
+    if (Objects.nonNull(statusUrls.get(responseChannel))) return;
+
     JsonObject query = new JsonObject();
     query.put("query", "checkHeartRate");
     query.put("notifyURL", baseBigDogUrl + responseChannel);
@@ -228,41 +231,39 @@ public final class DataSource extends AbstractVerticle {
 
     HttpClientRequest request = requestClient.post("/bigdawg/registeralert", handler -> {
       handler.bodyHandler(resp -> {
-        String statusUrl;
+        URI statusUrl;
         try {
-          statusUrl = new JsonObject(resp.toString()).getString("statusURL");
-        } catch (DecodeException e) {
+          statusUrl = new URI(new JsonObject(resp.toString()).getString("statusURL"));
+        } catch (DecodeException|URISyntaxException e) {
           System.out.println(resp.toString());
           return;
         }
-        startBigDawgTimer(responseChannel, statusUrl);
+        statusUrls.put(responseChannel, statusUrl.getPath());
       });
     });
     request.headers().set(HttpHeaders.CONTENT_TYPE, "application/json");
     request.end(query.encode());
   }
 
-  private void startBigDawgTimer(String responseChannel, String statusUrl) {
-    HttpClientRequest getData = requestClient.getAbs(statusUrl, dataResp -> {
-      dataResp.bodyHandler(d -> {
+  private long startBigDawgTimer() {
+    return vertx.setPeriodic(1000, t -> statusUrls.entrySet().forEach(e -> {
+      String absUrl = "http://" + bigDawgPollUrl + ":" + bigDawgPollPort + e.getValue();
+      HttpClientRequest getData = requestClient.getAbs(absUrl, dataResp -> dataResp.bodyHandler(d -> {
         if (!d.toString().equals("None")) {
-          eb.publish(responseChannel, new JsonObject(d.toString()));
+          eb.publish(e.getKey(), new JsonObject(d.toString()));
           System.out.println(d.toString());
         }
-      });
-    });
-    getData.end();
+      }));
+      getData.end();
+    }));
   }
 
   private void startStreamingQuery(String responseChannel, String type, String id, String ip) {
     long timerId;
 
     // If an entry exists, there is a timer running already, so just add the ip for tracking
-    if (Objects.nonNull(activeClientTimers.get(responseChannel))) {
-      activeListeners.compute(responseChannel, (k,v) -> {
-        v.add(ip);
-        return v;
-      });
+    if (isCached(responseChannel)) {
+      cacheIp(responseChannel, ip);
       return;
     }
 
@@ -274,16 +275,10 @@ public final class DataSource extends AbstractVerticle {
     }
 
     // And store the reference to the timer for caching
-    activeClientTimers.put(responseChannel, timerId);
-
-    System.out.println("Num active timers: " + activeClientTimers.size());
+    cacheTimer(responseChannel, timerId);
 
     // Then init the array and add the ip for tracking activity
-    activeListeners.compute(responseChannel, (k, v) -> {
-      if (Objects.isNull(v)) v = new ArrayList<>();
-      v.add(ip);
-      return v;
-    });
+    cacheIp(responseChannel, ip);
   }
 
   private boolean isCached(String responseChannel) {
@@ -299,7 +294,7 @@ public final class DataSource extends AbstractVerticle {
   }
 
   private void cacheTimer(String responseChannel, long timerId) {
-    if (Objects.nonNull(activeClientTimers.get(responseChannel))) {
+    if (!isCached(responseChannel)) {
       activeClientTimers.put(responseChannel, timerId);
     }
   }
