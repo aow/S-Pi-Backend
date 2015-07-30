@@ -57,7 +57,10 @@ final class Options {
         ", sstoreClientHost='" + sstoreClientHost + '\'' +
         ", sstoreClientPort=" + sstoreClientPort +
         ", bigDawg=" + bigDawg +
-        ", bigDawgUrl='" + bigDawgUrl + '\'' +
+        ", bigDawgRequestUrl='" + bigDawgRequestUrl + '\'' +
+        ", bigDawgRequestPort=" + bigDawgRequestPort +
+        ", bigDawgPollUrl='" + bigDawgPollUrl + '\'' +
+        ", bigDawgPollPort=" + bigDawgPollPort +
         '}';
   }
 }
