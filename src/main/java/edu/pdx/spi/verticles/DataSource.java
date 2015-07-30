@@ -155,38 +155,8 @@ public final class DataSource extends AbstractVerticle {
     }
 
     if (BD) {
-      JsonObject query = new JsonObject();
-      query.put("query", "checkHeartRate");
-      query.put("notifyURL", baseBigDogUrl + responseChannel);
-      query.put("authorization", new JsonObject());
-      query.put("pushNotify", false);
-      query.put("oneTime", false);
-      //TODO: do something here for bigdawg alerts
-      // Our routes that BigDawg will post back to should be in the form /incoming/[alertId]
-      timerId = vertx.setPeriodic(1000, t -> {
-        HttpClientRequest request = requestClient.post("/bigdawg/registeralert", handler -> {
-          handler.bodyHandler(resp -> {
-            String respUrl;
-            try {
-              respUrl = new JsonObject(resp.toString()).getString("statusURL");
-            } catch (DecodeException e) {
-              System.out.println(resp.toString());
-              return;
-            }
-            HttpClientRequest getData = requestClient.getAbs(respUrl, dataResp -> {
-              dataResp.bodyHandler(d -> {
-                if (!d.toString().equals("None")) {
-                  eb.publish(responseChannel, new JsonObject(d.toString()));
-                  System.out.println(d.toString());
-                }
-              });
-            });
-            getData.end();
-          });
-        });
-        request.headers().set(HttpHeaders.CONTENT_TYPE, "application/json");
-        request.end(query.encode());
-      });
+      requestBigDawgAlert(responseChannel);
+      timerId = startBigDawgTimer();
     } else if (SSTORE) {
       //TODO: Don't think this needs to be here anymore, but good to implement in case of future need.
       timerId = startSstoreTimer(responseChannel, "alert", id);
