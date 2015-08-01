@@ -34,14 +34,18 @@ public class SstoreConnector extends AbstractVerticle {
 
     eb.consumer("sstore", msg -> {
       JsonObject jmsg = (JsonObject)msg.body();
+      String queryType = jmsg.getString("query");
       Optional<JsonObject> outMsg;
       //long startTime = System.nanoTime();
       outMsg = !reconnecting ? query(jmsg.getString("query"), jmsg.getString("id")) : Optional.empty();
       //long endTime = System.nanoTime();
       //System.out.println("Query took " + (endTime-startTime)/1000000 + " ms.");
-      if (outMsg.isPresent()) {
+      if (outMsg.isPresent() && !queryType.equals("alert")) {
         // Send to specific channels for web.
         eb.publish(jmsg.getString("channel"), outMsg.get());
+      } else if (outMsg.isPresent()) {
+        eb.publish(jmsg.getString("channel"), outMsg.get());
+        eb.publish(ALL_ALERTS, outMsg.get());
       }
     });
   }
