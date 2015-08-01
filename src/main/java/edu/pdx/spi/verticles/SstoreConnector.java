@@ -81,7 +81,7 @@ public class SstoreConnector extends AbstractVerticle {
   private void retryOpen() {
     if (!socket.isConnected() && !reconnecting) {
       reconnecting = true;
-      vertx.setPeriodic(1000, h -> {
+      vertx.setPeriodic(5000, h -> {
         openSocket(host, port);
         if (socket.isConnected()) {
           vertx.cancelTimer(h);
