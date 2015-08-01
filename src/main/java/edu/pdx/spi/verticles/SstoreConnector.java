@@ -42,8 +42,6 @@ public class SstoreConnector extends AbstractVerticle {
       if (outMsg.isPresent()) {
         // Send to specific channels for web.
         eb.publish(jmsg.getString("channel"), outMsg.get());
-        // Send to allAlerts channel for phone/watch.
-        eb.publish(ALL_ALERTS, outMsg.get());
       }
     });
   }
@@ -105,8 +103,6 @@ public class SstoreConnector extends AbstractVerticle {
       queryText = new JsonObject().put("proc", "GetRecentAlerts").put("args", args).encode();
     }
     socketWriter.println(queryText);
-
-    System.out.println("Sent s-store query.");
 
     try {
       JsonObject response = new JsonObject(socketReader.readLine());
