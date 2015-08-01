@@ -20,7 +20,7 @@ public class SstoreDataProvider implements DataProvider {
     this.eb = this.vertx.eventBus();
   }
 
-  public void startStream(String responseChannel, String type, String id, String ip) {
+  @Override public void startStream(String responseChannel, String type, String id, String ip) {
     if (cache.cacheIfPresent(responseChannel, ip)) {
       return;
     }
@@ -32,7 +32,7 @@ public class SstoreDataProvider implements DataProvider {
     cache.cache(responseChannel, timerId, ip);
   }
 
-  public void startAlert(String responseChannel, String id, String ip) {
+  @Override public void startAlert(String responseChannel, String id, String ip) {
     if (cache.cacheIfPresent(responseChannel, ip)) {
       return;
     }
