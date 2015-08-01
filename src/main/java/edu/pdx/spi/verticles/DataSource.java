@@ -1,14 +1,14 @@
 package edu.pdx.spi.verticles;
 
-import static edu.pdx.spi.ChannelNames.*;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.pdx.spi.fakedata.models.Patient;
+import edu.pdx.spi.utils.QueryCache;
 import io.vertx.core.AbstractVerticle;
-import io.vertx.core.Handler;
-import io.vertx.core.buffer.Buffer;
 import io.vertx.core.eventbus.EventBus;
-import io.vertx.core.http.*;
+import io.vertx.core.http.HttpClient;
+import io.vertx.core.http.HttpClientOptions;
+import io.vertx.core.http.HttpClientRequest;
+import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.json.DecodeException;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
@@ -16,6 +16,8 @@ import io.vertx.core.json.JsonObject;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
+
+import static edu.pdx.spi.ChannelNames.*;
 
 final class Patients {
   Map<Integer, Patient> patients = new HashMap<>();
@@ -41,16 +43,14 @@ public final class DataSource extends AbstractVerticle {
   ObjectMapper om = new ObjectMapper();
   Random rn;
   EventBus eb;
-  Map<String, Long> activeClientTimers;
-  Map<String, List<String>> activeListeners;
   boolean SSTORE;
   boolean BD;
   HttpClient requestClient;
   HttpClientOptions clientOptions;
   String baseBigDogUrl;
-  Map<String, String> statusUrls;
   String bigDawgPollUrl;
   int bigDawgPollPort;
+  QueryCache cache;
 
 
   public void start() {
@@ -58,11 +58,9 @@ public final class DataSource extends AbstractVerticle {
     BD = this.config().getBoolean("bigDawg");
     rn = new Random();
     eb = vertx.eventBus();
-    activeClientTimers = new HashMap<>();
-    activeListeners = new HashMap<>();
+    cache = new QueryCache(this.getVertx());
 
     if (BD) {
-      statusUrls = new HashMap<>();
       clientOptions = new HttpClientOptions()
           .setDefaultHost(this.config().getString("bigDawgRequestUrl"))
           .setDefaultPort(this.config().getInteger("bigDawgRequestPort"));
@@ -101,9 +99,9 @@ public final class DataSource extends AbstractVerticle {
   }
 
   /**
-   *  Listens for requests for streams and handles setting up the response channel
-   *  as well as starting the stream itself. Replies with the requested stream's outgoing
-   *  channel.
+   * Listens for requests for streams and handles setting up the response channel
+   * as well as starting the stream itself. Replies with the requested stream's outgoing
+   * channel.
    */
   private void registerStreamRequestEventBusHandler() {
     eb.consumer(WAVEFORM_REQ, m -> {
@@ -128,20 +126,7 @@ public final class DataSource extends AbstractVerticle {
 
   private void registerTerminateStreamSessionEventBusHandler() {
     eb.consumer(STREAM_END, m -> {
-      // For every channel's listener list
-      activeListeners.entrySet().forEach(e -> {
-        // Try and remove a single count for the IP that just disconnected
-        // Don't remove all instances, as the client can have multiple windows open
-        e.getValue().remove(m.body());
-        // If the client list is empty, that means the channel is no longer needed
-        if (e.getValue().isEmpty()) {
-          // So kill the timer
-          killTimer(e.getKey());
-        }
-      });
-      // Then clear out the reference to it in the cache.
-      activeListeners.entrySet().removeIf(e -> e.getValue().isEmpty());
-      System.out.println("Killed timer");
+      cache.removeClient(m.body().toString());
     });
   }
 
@@ -149,13 +134,15 @@ public final class DataSource extends AbstractVerticle {
     // Same deal as startStreamingQuery.
     long timerId;
 
-    if (isCached(responseChannel)) {
-      cacheIp(responseChannel, ip);
+
+    if (cache.isChannelActive(responseChannel)) {
+      cache.addClient(responseChannel, ip);
       return;
     }
 
     if (BD) {
       requestBigDawgAlert(responseChannel);
+      //TODO: Fix this so only one BD timer runs.
       timerId = startBigDawgTimer();
     } else if (SSTORE) {
       //TODO: Don't think this needs to be here anymore, but good to implement in case of future need.
@@ -165,32 +152,15 @@ public final class DataSource extends AbstractVerticle {
       timerId = startFakeAlertTimer(responseChannel);
     }
 
-    cacheTimer(responseChannel, timerId);
-    cacheIp(responseChannel, ip);
+    cache.addChannel(responseChannel, timerId);
+    cache.addClient(responseChannel, ip);
   }
 
-  private void registerBigDawgPushAlerts(String responseChannel) {
-    JsonObject query = new JsonObject();
-    //TODO: Figure out what proc to call.
-    query.put("query", "checkHeartRate");
-    query.put("notifyURL", baseBigDogUrl + responseChannel);
-    query.put("authorization", new JsonObject());
-    query.put("pushNotify", true);
-    query.put("oneTime", false);
-    //TODO: do something here for bigdawg alerts
-    // Our routes that BigDawg will post back to should be in the form /incoming/[alertId]
-    HttpClientRequest request = requestClient.post("/bigdawg/registeralert", handler -> {
-      System.out.println(handler.statusMessage());
-      handler.bodyHandler(System.out::println);
-    });
-    System.out.println("Sending BD post");
-    request.headers().set(HttpHeaders.CONTENT_TYPE, "application/json");
-    request.end(query.encode());
-    System.out.println("Sent BD post");
-  }
 
   private void requestBigDawgAlert(String responseChannel) {
-    if (Objects.nonNull(statusUrls.get(responseChannel))) return;
+    if (cache.isChannelActive(responseChannel)) {
+      return;
+    }
 
     JsonObject query = new JsonObject();
     query.put("query", "checkHeartRate");
@@ -204,11 +174,16 @@ public final class DataSource extends AbstractVerticle {
         URI statusUrl;
         try {
           statusUrl = new URI(new JsonObject(resp.toString()).getString("statusURL"));
-        } catch (DecodeException|URISyntaxException e) {
+          System.out.println(statusUrl);
+        } catch (DecodeException | URISyntaxException e) {
           System.out.println(resp.toString());
           return;
         }
-        statusUrls.put(responseChannel, statusUrl.getPath());
+        if (bigDawgPollUrl.equals("")) {
+          cache.addChannel(responseChannel, statusUrl.toString());
+        } else {
+          cache.addChannel(responseChannel, statusUrl.getPath());
+        }
       });
     });
     request.headers().set(HttpHeaders.CONTENT_TYPE, "application/json");
@@ -216,15 +191,23 @@ public final class DataSource extends AbstractVerticle {
   }
 
   private long startBigDawgTimer() {
-    return vertx.setPeriodic(1000, t -> statusUrls.entrySet().forEach(e -> {
-      String absUrl = "http://" + bigDawgPollUrl + ":" + bigDawgPollPort + e.getValue();
+    return vertx.setPeriodic(2000, t -> cache.getStatusUrls().entrySet().forEach(e -> {
+      String absUrl;
+      if (bigDawgPollUrl.equals("")) {
+        absUrl = e.getValue();
+      } else {
+        absUrl = "http://" + bigDawgPollUrl + ":" + bigDawgPollPort + e.getValue();
+      }
+      System.out.println("Querying: " + absUrl);
       HttpClientRequest getData = requestClient.getAbs(absUrl, dataResp -> dataResp.bodyHandler(d -> {
+        System.out.println(d.toString());
         if (!d.toString().equals("None")) {
           eb.publish(e.getKey(), new JsonObject(d.toString()));
           System.out.println(d.toString());
         }
       }));
       getData.end();
+      System.out.println(cache.getStatusCount());
     }));
   }
 
@@ -232,8 +215,9 @@ public final class DataSource extends AbstractVerticle {
     long timerId;
 
     // If an entry exists, there is a timer running already, so just add the ip for tracking
-    if (isCached(responseChannel)) {
-      cacheIp(responseChannel, ip);
+
+    if (cache.isChannelActive(responseChannel)) {
+      cache.addClient(responseChannel, ip);
       return;
     }
 
@@ -245,28 +229,9 @@ public final class DataSource extends AbstractVerticle {
     }
 
     // And store the reference to the timer for caching
-    cacheTimer(responseChannel, timerId);
-
+    cache.addChannel(responseChannel, timerId);
     // Then init the array and add the ip for tracking activity
-    cacheIp(responseChannel, ip);
-  }
-
-  private boolean isCached(String responseChannel) {
-    return Objects.nonNull(activeClientTimers.get(responseChannel));
-  }
-
-  private void cacheIp(String responseChannel, String ip) {
-    activeListeners.compute(responseChannel, (channel, ips) -> {
-      if (Objects.isNull(ips)) ips = new ArrayList<>();
-      ips.add(ip);
-      return ips;
-    });
-  }
-
-  private void cacheTimer(String responseChannel, long timerId) {
-    if (!isCached(responseChannel)) {
-      activeClientTimers.put(responseChannel, timerId);
-    }
+    cache.addClient(responseChannel, ip);
   }
 
   private long startFakeAlertTimer(String responseChannel) {
@@ -294,7 +259,7 @@ public final class DataSource extends AbstractVerticle {
       JsonArray jsa = new JsonArray();
       for (int i = 0; i < 125; i++) {
         JsonObject json = new JsonObject();
-        json.put("TS", startTime + 8*i);
+        json.put("TS", startTime + 8 * i);
         json.put("SIGNAL", Math.abs(rn.nextGaussian()) * 25);
         jsa.add(json);
       }
@@ -309,8 +274,24 @@ public final class DataSource extends AbstractVerticle {
     return vertx.setPeriodic(1000, t -> eb.publish("sstore", outData));
   }
 
-  private void killTimer(String name) {
-    vertx.cancelTimer(activeClientTimers.get(name));
-    activeClientTimers.remove(name);
+  // Unused
+  private void registerBigDawgPushAlerts(String responseChannel) {
+    JsonObject query = new JsonObject();
+    //TODO: Figure out what proc to call.
+    query.put("query", "checkHeartRate");
+    query.put("notifyURL", baseBigDogUrl + responseChannel);
+    query.put("authorization", new JsonObject());
+    query.put("pushNotify", true);
+    query.put("oneTime", false);
+    //TODO: do something here for bigdawg alerts
+    // Our routes that BigDawg will post back to should be in the form /incoming/[alertId]
+    HttpClientRequest request = requestClient.post("/bigdawg/registeralert", handler -> {
+      System.out.println(handler.statusMessage());
+      handler.bodyHandler(System.out::println);
+    });
+    System.out.println("Sending BD post");
+    request.headers().set(HttpHeaders.CONTENT_TYPE, "application/json");
+    request.end(query.encode());
+    System.out.println("Sent BD post");
   }
 }
