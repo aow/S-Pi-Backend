@@ -82,6 +82,26 @@ public final class QueryCache {
     return clients.size();
   }
 
+  public boolean cache(String channelName, long timerId, String ip) {
+    if (this.isChannelActive(channelName)) {
+      this.addClient(channelName, ip);
+      return true;
+    }
+
+    this.addChannel(channelName, timerId);
+    this.addClient(channelName, ip);
+    return false;
+  }
+
+  public boolean cacheIfPresent(String channelName, String ip) {
+    if (this.isChannelActive(channelName)) {
+      this.addClient(channelName, ip);
+      return true;
+    }
+
+    return false;
+  }
+
   private void unregisterTimer(String channelName, long timerId) {
     vertx.cancelTimer(timerId);
     channelTimers.remove(channelName);
