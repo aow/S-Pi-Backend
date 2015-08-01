@@ -127,4 +127,25 @@ public class BigDawgDataProvider implements DataProvider {
       System.out.println(cache.getStatusCount());
     }));
   }
+
+    // Unused
+//  private void registerBigDawgPushAlerts(String responseChannel) {
+//    JsonObject query = new JsonObject();
+//    //TODO: Figure out what proc to call.
+//    query.put("query", "checkHeartRate");
+//    query.put("notifyURL", baseBigDogUrl + responseChannel);
+//    query.put("authorization", new JsonObject());
+//    query.put("pushNotify", true);
+//    query.put("oneTime", false);
+//    //TODO: do something here for bigdawg alerts
+//    // Our routes that BigDawg will post back to should be in the form /incoming/[alertId]
+//    HttpClientRequest request = requestClient.post("/bigdawg/registeralert", handler -> {
+//      System.out.println(handler.statusMessage());
+//      handler.bodyHandler(System.out::println);
+//    });
+//    System.out.println("Sending BD post");
+//    request.headers().set(HttpHeaders.CONTENT_TYPE, "application/json");
+//    request.end(query.encode());
+//    System.out.println("Sent BD post");
+//  }
 }
