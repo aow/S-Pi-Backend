@@ -7,6 +7,7 @@ import edu.pdx.spi.verticles.Deploy;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Verticle;
 import io.vertx.core.Vertx;
+import io.vertx.core.file.OpenOptions;
 import io.vertx.core.json.JsonObject;
 
 import java.io.IOException;
@@ -84,6 +85,11 @@ public class Runner {
       }
     } else {
       options = new Options();
+      try {
+        Files.write(configFile, om.writeValueAsBytes(options), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+      } catch (IOException e) {
+        System.out.println("Error writing new default config file.");
+      }
     }
 
     Vertx vtx = Vertx.vertx();
