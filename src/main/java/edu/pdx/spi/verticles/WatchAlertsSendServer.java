@@ -53,7 +53,7 @@ public class WatchAlertsSendServer extends AbstractVerticle {
 
     eb.consumer(ALL_ALERTS, msg -> {
       for (String userGcmRegistrationToken : userGcmRegistrationTokens) {
-        GcmContent content = createContent(userGcmRegistrationToken, ((JsonObject) msg).encode());
+        GcmContent content = createContent(userGcmRegistrationToken, (new JsonObject((String)msg.body())).encode());
         sendMessage(content, API_KEY);
       }
     });
