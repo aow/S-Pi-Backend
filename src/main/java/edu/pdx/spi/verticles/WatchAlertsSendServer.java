@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.pdx.spi.GcmContent;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.eventbus.EventBus;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 
 import java.io.BufferedReader;
@@ -52,8 +53,11 @@ public class WatchAlertsSendServer extends AbstractVerticle {
     });
 
     eb.consumer(ALL_ALERTS, msg -> {
+      JsonObject m = (JsonObject) msg.body();
+      JsonArray data = m.getJsonArray("data");
+
       for (String userGcmRegistrationToken : userGcmRegistrationTokens) {
-        GcmContent content = createContent(userGcmRegistrationToken, (new JsonObject((String)msg.body())).encode());
+        GcmContent content = createContent(userGcmRegistrationToken, data.getJsonObject(0).encode());
         sendMessage(content, API_KEY);
       }
     });
