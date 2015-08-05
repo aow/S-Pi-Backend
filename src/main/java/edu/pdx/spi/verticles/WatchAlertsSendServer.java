@@ -50,7 +50,7 @@ public class WatchAlertsSendServer extends AbstractVerticle {
       System.out.println("Received New User Registration: " + userRegToken);
 
       // add new token to list
-      if (userGcmRegistrationTokens.contains(userRegToken)) {
+      if (!userGcmRegistrationTokens.contains(userRegToken)) {
         userGcmRegistrationTokens.add(userRegToken);
       }
     });
@@ -114,8 +114,8 @@ public class WatchAlertsSendServer extends AbstractVerticle {
 
       // 6. Get the response
       int responseCode = conn.getResponseCode();
-      // System.out.println("\nSending 'POST' request to URL : " + url);
-      // System.out.println("Response Code : " + responseCode);
+       System.out.println("\nSending 'POST' request to URL : " + url);
+       System.out.println("Response Code : " + responseCode);
 
       BufferedReader in = new BufferedReader(
           new InputStreamReader(conn.getInputStream()));
