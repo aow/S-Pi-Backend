@@ -96,7 +96,7 @@ public class BigDawgDataProvider implements DataProvider {
           System.out.println(resp.toString());
           return;
         }
-        if (bigDawgPollUrl.equals("")) {
+        if (bigDawgPollUrl.isEmpty()) {
           cache.addChannel(responseChannel, statusUrl.toString());
         } else {
           cache.addChannel(responseChannel, statusUrl.getPath());
@@ -110,7 +110,7 @@ public class BigDawgDataProvider implements DataProvider {
   private long startBigDawgTimer() {
     return vertx.setPeriodic(2000, t -> cache.getStatusUrls().entrySet().forEach(e -> {
       String absUrl;
-      if (bigDawgPollUrl.equals("")) {
+      if (bigDawgPollUrl.isEmpty()) {
         absUrl = e.getValue();
       } else {
         absUrl = "http://" + bigDawgPollUrl + ":" + bigDawgPollPort + e.getValue();

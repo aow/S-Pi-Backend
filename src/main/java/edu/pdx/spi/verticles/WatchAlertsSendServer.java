@@ -15,6 +15,7 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -37,7 +38,7 @@ public class WatchAlertsSendServer extends AbstractVerticle {
     // (maintain mapping of active users instead of just ones who've registered...)
 
     // GCM registration numbers
-    List<String> userGcmRegistrationTokens = new LinkedList<>();
+    List<String> userGcmRegistrationTokens = new ArrayList<>();
 
     eb = vertx.eventBus();
 
@@ -49,7 +50,9 @@ public class WatchAlertsSendServer extends AbstractVerticle {
       System.out.println("Received New User Registration: " + userRegToken);
 
       // add new token to list
-      userGcmRegistrationTokens.add(userRegToken);
+      if (userGcmRegistrationTokens.contains(userRegToken)) {
+        userGcmRegistrationTokens.add(userRegToken);
+      }
     });
 
     eb.consumer(ALL_ALERTS, msg -> {

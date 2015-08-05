@@ -4,13 +4,23 @@ import io.vertx.core.AbstractVerticle;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
-import static edu.pdx.spi.ChannelNames.*;
-import java.io.*;
-import java.net.ConnectException;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.net.Socket;
-import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
-import java.util.*;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.Objects;
+import java.util.Optional;
+
+import static edu.pdx.spi.ChannelNames.ALL_ALERTS;
+import static edu.pdx.spi.ChannelNames.STREAM_RESTART;
 
 public class SstoreConnector extends AbstractVerticle {
   Socket socket;

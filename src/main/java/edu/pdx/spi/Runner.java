@@ -3,6 +3,7 @@ package edu.pdx.spi;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import edu.pdx.spi.verticles.Deploy;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Verticle;
@@ -70,6 +71,7 @@ public class Runner {
 
   public static void main(final String... args) {
     ObjectMapper om = new ObjectMapper();
+    om.enable(SerializationFeature.INDENT_OUTPUT);
     DeploymentOptions deploymentOptions = new DeploymentOptions();
     Options options = null;
 
