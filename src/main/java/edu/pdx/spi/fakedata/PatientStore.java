@@ -1,20 +1,45 @@
 package edu.pdx.spi.fakedata;
 
 import edu.pdx.spi.fakedata.models.Patient;
+import edu.pdx.spi.fakedata.models.PatientLabs;
+import edu.pdx.spi.fakedata.models.PatientMed;
+import edu.pdx.spi.fakedata.models.PatientNotes;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVRecord;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.io.*;
+import java.net.URL;
+import java.util.*;
 
 final public class PatientStore {
-
   final Map<Integer, Patient> patients;
+  final Map<Integer, Integer> idMapping;
+  Reader in;
 
   public PatientStore() {
     patients = new HashMap<>();
-    patients.put(1, new Patient(1,"100","Ann Droid",65,"n/a",3386,26692,4201,65,0,99.9,102,"n/a",true,"0/0"));
-    patients.put(2, new Patient(2,"101","Mike Rosoft",71,"n/a",124,12906,152,71.5,175.26,98,76,"n/a",true,"117/58"));
-    patients.put(3, new Patient(3,"102","Mac Intosh",79,"n/a",4833,23746,6004,118,0,91.6,128,"n/a",true,"98/49"));
-    patients.put(4, new Patient(4,"103","Java Script",80,"n/a",1158,19617,1434,55.4,154.94,96.5,87,"n/a",true,"0/0"));
+    idMapping = new HashMap<>();
+
+    getParsedFile(getClass().getClassLoader().getResourceAsStream("patient_overview.csv")).get().forEach(record -> {
+      Patient p = new Patient(record.toMap());
+      patients.put(p.id(), p);
+      idMapping.put(p.pid(), p.id());
+    });
+
+    getParsedFile(getClass().getClassLoader().getResourceAsStream("patient_progress.csv")).get().forEach(record -> {
+      PatientNotes pn = new PatientNotes(record.toMap());
+      patients.get(idMapping.get(pn.pid())).addNote(pn);
+    });
+
+    getParsedFile(getClass().getClassLoader().getResourceAsStream("patient_labs.csv")).get().forEach(record -> {
+      PatientLabs pl = new PatientLabs(record.toMap());
+      patients.get(idMapping.get(pl.pid())).addLab(pl);
+    });
+
+    getParsedFile(getClass().getClassLoader().getResourceAsStream("patient_medicine.csv")).get().forEach(record -> {
+      PatientMed pm = new PatientMed(record.toMap());
+      patients.get(idMapping.get(pm.pid())).addMed(pm);
+    });
   }
 
   public Patient getPatient(int id) {
@@ -23,5 +48,16 @@ final public class PatientStore {
 
   public Map<Integer, Patient> getAllPatients() {
     return patients;
+  }
+
+  private Optional<Iterable<CSVRecord>> getParsedFile(InputStream fileName) {
+    in = new InputStreamReader(fileName);
+    try {
+      Iterable<CSVRecord> patient = CSVFormat.DEFAULT.withHeader().withIgnoreSurroundingSpaces().parse(in);
+      return Optional.ofNullable(patient);
+    } catch (IOException e) {
+      System.out.println("Error parsing csv file");
+      return Optional.empty();
+    }
   }
 }

@@ -1,0 +1,5 @@
+id,bed,name,age,status,patient_id,hospital_admission_id,case_id,weight,height,temperature,heart-rate,allergies,cardiac,blood_pressure
+2,,Mike Rosoft,71,n/a,124,12906,152,71.5,175.26,98,76,n/a,t,117/58
+1,,Ann Droid,65,n/a,3386,26692,4201,65,0,99.9,102,n/a,t,0/0
+3,,Mac Intosh,79,n/a,4833,23746,6004,118,0,91.6,128,n/a,t,98/49
+4,,Java Script,80,n/a,1158,19617,1434,55.4,154.94,96.5,87,n/a,t,0/0

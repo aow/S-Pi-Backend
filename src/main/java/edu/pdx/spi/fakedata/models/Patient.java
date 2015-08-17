@@ -5,13 +5,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 public class Patient {
   @JsonProperty("id")
   Integer id;
   @JsonProperty("bed")
-  String roomNum;
+  Integer roomNum;
   @JsonProperty("name")
   String name;
   @JsonProperty("age")
@@ -39,29 +40,54 @@ public class Patient {
   @JsonProperty("blood_pressure")
   String bloodPressure;
   @JsonProperty("clinical_notes")
-  PatientNotes notes;
+  List<PatientNotes> notes;
+  @JsonProperty("labs")
+  List<PatientLabs> labs;
+  @JsonProperty("meds")
+  List<PatientMed> meds;
 
   @JsonIgnore
   String[] statuses = {"Critical", "Stable", "Serious"};
 
-  public Patient(int id, String bed, String name, int age, String status, int patientId,
-                 int hospId, int caseId, double weight, double height, double temperature,
-                 double heartRate, String allergies, boolean cardiac, String bloodPressure) {
-    this.id = id;
-    this.roomNum = bed;
-    this.name = name;
-    this.age = age;
-    this.status = status;
-    this.patientId = patientId;
-    this.admissionId = hospId;
-    this.caseId = caseId;
-    this.weight = weight;
-    this.height = height;
-    this.temperature = temperature;
-    this.heartRate = heartRate;
-    this.allergies = allergies;
-    this.cardiac = cardiac;
-    this.bloodPressure = bloodPressure;
-    this.notes = new PatientNotes(id);
+  public Patient(Map<String, String> patient) {
+    Random rn = new Random();
+    this.id = Integer.valueOf(patient.get("id"));
+    this.roomNum = rn.nextInt(100);
+    this.name = patient.get("name");
+    this.age = Integer.valueOf(patient.get("age"));
+    this.status = patient.get("status");
+    this.patientId = Integer.valueOf(patient.get("patient_id"));
+    this.admissionId = Integer.valueOf(patient.get("hospital_admission_id"));
+    this.caseId = Integer.valueOf(patient.get("case_id"));
+    this.weight = Double.valueOf(patient.get("weight"));
+    this.height = Double.valueOf(patient.get("height"));
+    this.temperature = Double.valueOf(patient.get("temperature"));
+    this.heartRate = Double.valueOf(patient.get("heart-rate"));
+    this.allergies = patient.get("allergies");
+    this.cardiac = "t".equals(patient.get("cardiac"));
+    this.bloodPressure = patient.get("blood_pressure");
+    this.notes = new ArrayList<>();
+    this.labs = new ArrayList<>();
+    this.meds = new ArrayList<>();
+  }
+
+  public int id() {
+    return this.id;
+  }
+
+  public int pid() {
+    return this.patientId;
+  }
+
+  public void addNote(PatientNotes pn) {
+    notes.add(pn);
+  }
+
+  public void addLab(PatientLabs pl) {
+    labs.add(pl);
+  }
+
+  public void addMed(PatientMed pm) {
+    meds.add(pm);
   }
 }
