@@ -75,6 +75,8 @@ public class SstoreConnector extends AbstractVerticle {
     } catch (IOException e) {
       System.out.println("Connection refused to S-Store client. Trying again in 1 second.");
       reconnecting = false;
+      retryOpen();
+      return;
     }
 
     try {
@@ -89,15 +91,15 @@ public class SstoreConnector extends AbstractVerticle {
   }
 
   private void retryOpen() {
-    if (!socket.isConnected() && !reconnecting) {
-      reconnecting = true;
-      vertx.setPeriodic(5000, h -> {
-        openSocket(host, port);
-        if (socket.isConnected()) {
-          vertx.cancelTimer(h);
-        }
-      });
-    }
+      if (Objects.isNull(socket) || (!socket.isConnected() && !reconnecting)) {
+        reconnecting = true;
+        vertx.setTimer(5000, h -> {
+          openSocket(host, port);
+          if (Objects.nonNull(socket) && socket.isConnected()) {
+            vertx.cancelTimer(h);
+          }
+        });
+      }
   }
 
   private Optional<JsonObject> query(String type, String userId) {
